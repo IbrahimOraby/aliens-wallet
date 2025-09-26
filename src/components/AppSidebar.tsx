@@ -13,11 +13,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const navigationItems = [
-  { title: "Overview", url: "/", icon: BarChart3 },
-  { title: "Orders", url: "/orders", icon: ShoppingCart },
-  { title: "Categories", url: "/categories", icon: Tags },
-  { title: "Specifications", url: "/specifications", icon: Grid3X3 },
-  { title: "Products", url: "/products", icon: Package },
+  { title: "Overview", url: "/admin", icon: BarChart3 },
+  { title: "Orders", url: "/admin/orders", icon: ShoppingCart },
+  { title: "Categories", url: "/admin/categories", icon: Tags },
+  { title: "Specifications", url: "/admin/specifications", icon: Grid3X3 },
+  { title: "Products", url: "/admin/products", icon: Package },
 ];
 
 export function AppSidebar() {
