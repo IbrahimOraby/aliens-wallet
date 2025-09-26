@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Modern Dark Dashboard Design System for Gift Cards Platform */
+
+@layer base {
+  :root {
+    --background: 210 7% 8%;
+    --foreground: 210 40% 98%;
+
+    --card: 210 7% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 210 7% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 142 76% 36%;
+    --primary-foreground: 210 7% 8%;
+
+    --secondary: 210 7% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 210 7% 15%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 210 7% 18%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 7% 8%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 210 7% 8%;
+
+    --info: 217 91% 60%;
+    --info-foreground: 210 7% 8%;
+
+    --border: 210 7% 18%;
+    --input: 210 7% 18%;
+    --ring: 142 76% 36%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 210 7% 6%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 142 76% 36%;
+    --sidebar-primary-foreground: 210 7% 6%;
+    --sidebar-accent: 210 7% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 210 7% 15%;
+    --sidebar-ring: 142 76% 36%;
+
+    /* Custom gradient backgrounds */
+    --gradient-primary: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 42%));
+    --gradient-card: linear-gradient(135deg, hsl(210 7% 11%), hsl(210 7% 13%));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 42%));
+    --gradient-danger: linear-gradient(135deg, hsl(0 72% 51%), hsl(0 72% 57%));
+    --gradient-warning: linear-gradient(135deg, hsl(38 92% 50%), hsl(38 92% 56%));
+    
+    /* Shadows for depth */
+    --shadow-sm: 0 2px 4px hsl(210 7% 4% / 0.1);
+    --shadow-md: 0 4px 12px hsl(210 7% 4% / 0.15);
+    --shadow-lg: 0 10px 30px hsl(210 7% 4% / 0.2);
+    --shadow-glow: 0 0 20px hsl(142 76% 36% / 0.3);
+
+    /* Animation variables */
+    --transition-base: all 0.2s ease-in-out;
+    --transition-slow: all 0.3s ease-in-out;
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142 76% 36%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

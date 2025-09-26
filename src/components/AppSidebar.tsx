@@ -1,0 +1,88 @@
+import { BarChart3, Package, ShoppingCart, Tags, Settings, Grid3X3, Home } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
+
+const navigationItems = [
+  { title: "Overview", url: "/", icon: BarChart3 },
+  { title: "Orders", url: "/orders", icon: ShoppingCart },
+  { title: "Categories", url: "/categories", icon: Tags },
+  { title: "Specifications", url: "/specifications", icon: Grid3X3 },
+  { title: "Products", url: "/products", icon: Package },
+];
+
+export function AppSidebar() {
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
+
+  const getNavClassName = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+      isActive
+        ? "bg-primary text-primary-foreground font-medium"
+        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+    }`;
+
+  return (
+    <Sidebar className={isCollapsed ? "w-16" : "w-64"} collapsible="icon">
+      <SidebarContent className="border-r border-border">
+        <div className="p-6 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+              <Home className="w-5 h-5 text-primary-foreground" />
+            </div>
+            {!isCollapsed && (
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">GiftHub</h2>
+                <p className="text-sm text-muted-foreground">Admin Dashboard</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground px-3 py-2">
+            {!isCollapsed && "Main Navigation"}
+          </SidebarGroupLabel>
+          
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navigationItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild>
+                    <NavLink to={item.url} end className={getNavClassName}>
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      {!isCollapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {!isCollapsed && (
+          <div className="mt-auto p-6 border-t border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-success rounded-full flex items-center justify-center">
+                <Settings className="w-4 h-4 text-success-foreground" />
+              </div>
+              <div className="text-sm">
+                <p className="font-medium text-foreground">Admin User</p>
+                <p className="text-muted-foreground">admin@gifthub.com</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </SidebarContent>
+    </Sidebar>
+  );
+}
