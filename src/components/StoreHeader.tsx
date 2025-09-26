@@ -3,10 +3,22 @@ import { ShoppingCart, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthService } from "@/services/auth";
 
 export const StoreHeader = () => {
   const { items } = useCart();
+  const { openAuthModal, isAuthenticated, user, setUser, setError } = useAuth();
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const handleLogout = async () => {
+    try {
+      await AuthService.logout();
+      setUser(null);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Logout failed');
+    }
+  };
 
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -31,9 +43,29 @@ export const StoreHeader = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon">
-              <User className="h-5 w-5" />
-            </Button>
+            {isAuthenticated ? (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground hidden sm:block">
+                  Welcome, {user?.name}
+                </span>
+                <Button 
+                  onClick={handleLogout}
+                  variant="ghost" 
+                  size="sm"
+                >
+                  Logout
+                </Button>
+              </div>
+            ) : (
+              <Button 
+                onClick={() => openAuthModal('login')} 
+                variant="ghost" 
+                size="icon"
+                title="Sign In"
+              >
+                <User className="h-5 w-5" />
+              </Button>
+            )}
             
             <Link to="/store/cart">
               <Button variant="ghost" size="icon" className="relative">
