@@ -26,7 +26,7 @@ export const StoreHeader = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-8">
             <Link to="/store" className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              DigitalVault
+              Alliens Wallet
             </Link>
             
             <nav className="hidden md:flex space-x-6">

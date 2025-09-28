@@ -8,7 +8,7 @@ export const StoreFooter = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <h3 className="text-lg font-semibold mb-4 bg-gradient-primary bg-clip-text text-transparent">
-              DigitalVault
+              Alliens Wallet
             </h3>
             <p className="text-muted-foreground text-sm">
               Your trusted destination for premium gift cards and digital services. 
@@ -78,7 +78,7 @@ export const StoreFooter = () => {
         </div>
 
         <div className="border-t border-border mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; 2024 DigitalVault. All rights reserved.</p>
+          <p>&copy; 2025 Alliens Wallet. All rights reserved.</p>
         </div>
       </div>
     </footer>
