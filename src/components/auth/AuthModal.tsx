@@ -112,11 +112,12 @@ export function AuthModal() {
           </Button>
         </div>
 
-        {error && (
+        {/* TODO: Add error message in toast*/}
+        {/* {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        )}
+        )} */}
 
         <div className="flex items-center justify-center">{renderForm()}</div>
       </DialogContent>

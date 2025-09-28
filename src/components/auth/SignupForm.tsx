@@ -1,51 +1,74 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
-import { signupSchema } from '@/schemas/auth';
-import { SignupFormData } from '@/types/auth';
-import { useAuth } from '@/contexts/AuthContext';
-import { AuthService } from '@/services/auth';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription
+} from "@/components/ui/form";
+import { signupSchema } from "@/schemas/auth";
+import { SignupFormData } from "@/types/auth";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthService } from "@/services/auth";
 
 interface SignupFormProps {
   onSwitchToLogin: () => void;
-  onSwitchToOTP: (userType?: 'ADMIN' | 'CUSTOMER') => void;
+  onSwitchToOTP: (userType?: "ADMIN" | "CUSTOMER") => void;
 }
 
-export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) {
+export function SignupForm({
+  onSwitchToLogin,
+  onSwitchToOTP
+}: SignupFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { setLoading, setError, clearError, setQRCode } = useAuth();
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      userType: 'CUSTOMER',
-    },
+      userType: "CUSTOMER"
+    }
   });
 
-  const userType = form.watch('userType');
+  const userType = form.watch("userType");
 
   const onSubmit = async (data: SignupFormData) => {
     try {
       clearError();
       setLoading(true);
-      
+
       // Ensure all required fields are present
       const signupData: SignupFormData = {
         name: data.name!,
         email: data.email!,
         password: data.password!,
         phoneNumber: data.phoneNumber!,
-        userType: data.userType!,
+        userType: data.userType!
       };
-      
+
       const result = await AuthService.signup(signupData);
-      
+
       if (result.requiresOTP) {
         // If admin or requires OTP, store QR code and show OTP form
         if (result.qrCodeUrl) {
@@ -55,10 +78,10 @@ export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) 
       } else {
         // If customer, navigate to store
         // TODO: Handle customer signup success - navigate to /store
-        console.log('Customer signup successful', result.user);
+        console.log("Customer signup successful", result.user);
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Signup failed');
+      setError(error instanceof Error ? error.message : "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -141,7 +164,10 @@ export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) 
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Account Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select account type" />
@@ -166,7 +192,7 @@ export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) 
                       <FormControl>
                         <div className="relative">
                           <Input
-                            type={showPassword ? 'text' : 'password'}
+                            type={showPassword ? "text" : "password"}
                             placeholder="Create a strong password"
                             {...field}
                             className="pr-10"
@@ -186,10 +212,11 @@ export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) 
                           </Button>
                         </div>
                       </FormControl>
-                      <FormDescription>
-                        Password must contain uppercase, lowercase, number, and special character
-                      </FormDescription>
                       <FormMessage />
+                      <FormDescription>
+                        Password must contain uppercase, lowercase, number, and
+                        special character
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
@@ -207,7 +234,7 @@ export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) 
                   Creating Account...
                 </>
               ) : (
-                'Create Account'
+                "Create Account"
               )}
             </Button>
           </form>
@@ -215,7 +242,7 @@ export function SignupForm({ onSwitchToLogin, onSwitchToOTP }: SignupFormProps) 
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Button
               variant="link"
               className="p-0 h-auto font-normal"
