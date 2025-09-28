@@ -1,83 +1,96 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, Folder, FolderOpen } from "lucide-react";
+import { Plus, Edit, Trash2, Folder, FolderOpen, Loader2, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  parentId?: string;
-  children?: Category[];
-  productCount: number;
-}
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { categoriesService } from "@/services/categories";
+import { Category, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/category";
 
 export default function Categories() {
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      id: "1",
-      name: "Gift Cards",
-      slug: "gift-cards",
-      productCount: 25,
-      children: [
-        { id: "1-1", name: "Entertainment", slug: "entertainment", parentId: "1", productCount: 12 },
-        { id: "1-2", name: "Shopping", slug: "shopping", parentId: "1", productCount: 8 },
-        { id: "1-3", name: "Gaming", slug: "gaming", parentId: "1", productCount: 5 }
-      ]
-    },
-    {
-      id: "2", 
-      name: "Digital Services",
-      slug: "digital-services",
-      productCount: 18,
-      children: [
-        { id: "2-1", name: "Streaming", slug: "streaming", parentId: "2", productCount: 10 },
-        { id: "2-2", name: "Software", slug: "software", parentId: "2", productCount: 5 },
-        { id: "2-3", name: "Cloud Storage", slug: "cloud-storage", parentId: "2", productCount: 3 }
-      ]
-    }
-  ]);
-
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({ name: "", parentId: "" });
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingCategory) {
-      // Update category logic
-      console.log("Updating category:", editingCategory.id, formData);
-    } else {
-      // Create new category logic
-      const newCategory: Category = {
-        id: Date.now().toString(),
-        name: formData.name,
-        slug: formData.name.toLowerCase().replace(/\s+/g, '-'),
-        parentId: formData.parentId || undefined,
-        productCount: 0
-      };
-      console.log("Creating category:", newCategory);
+  // Load categories on component mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await categoriesService.getCategories({ offset: 0, limit: 50 });
+      setCategories(response.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load categories');
+    } finally {
+      setLoading(false);
     }
-    setIsDialogOpen(false);
-    setEditingCategory(null);
-    setFormData({ name: "", parentId: "" });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    
+    try {
+      if (editingCategory) {
+        // Update category
+        const updateData: UpdateCategoryRequest = {
+          name: formData.name,
+          parentId: formData.parentId ? parseInt(formData.parentId) : null
+        };
+        await categoriesService.updateCategory(editingCategory.id, updateData);
+      } else {
+        // Create new category
+        const createData: CreateCategoryRequest = {
+          name: formData.name,
+          parentId: formData.parentId ? parseInt(formData.parentId) : null
+        };
+        await categoriesService.createCategory(createData);
+      }
+      
+      // Reload categories after successful operation
+      await loadCategories();
+      setIsDialogOpen(false);
+      setEditingCategory(null);
+      setFormData({ name: "", parentId: "" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save category');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    setFormData({ name: category.name, parentId: category.parentId || "" });
+    setFormData({ 
+      name: category.name, 
+      parentId: category.parentId?.toString() || "" 
+    });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (categoryId: string) => {
+  const handleDelete = async (categoryId: number) => {
     if (confirm("Are you sure you want to delete this category? This action cannot be undone.")) {
-      console.log("Deleting category:", categoryId);
-      // Delete logic here
+      try {
+        setLoading(true);
+        await categoriesService.deleteCategory(categoryId);
+        await loadCategories();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to delete category');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -92,7 +105,7 @@ export default function Categories() {
       </TableCell>
       <TableCell className="font-mono text-sm text-muted-foreground">{category.slug}</TableCell>
       <TableCell>
-        <Badge variant="outline">{category.productCount} products</Badge>
+        <Badge variant="outline">0 products</Badge>
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-2">
@@ -105,8 +118,8 @@ export default function Categories() {
         </div>
       </TableCell>
     </TableRow>
-  );
-
+    );
+ 
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -152,7 +165,7 @@ export default function Categories() {
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="">-- Select Parent Category --</option>
-                  {categories.map((cat) => (
+                  {categories.filter(cat => !cat.parentId).map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name}
                     </option>
@@ -172,7 +185,12 @@ export default function Categories() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-gradient-primary hover:opacity-90">
+                <Button 
+                  type="submit" 
+                  className="bg-gradient-primary hover:opacity-90"
+                  disabled={submitting}
+                >
+                  {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {editingCategory ? "Update" : "Create"}
                 </Button>
               </div>
@@ -181,35 +199,60 @@ export default function Categories() {
         </Dialog>
       </div>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       {/* Categories Table */}
       <Card>
         <CardHeader>
           <CardTitle>Categories & Subcategories</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Slug</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {categories.map((category) => (
-                <React.Fragment key={category.id}>
-                  {renderCategoryRow(category)}
-                  {category.children?.map((child) => renderCategoryRow(child, true))}
-                </React.Fragment>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {categories.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No categories found. Create your first category to get started.</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span>Loading categories...</span>
             </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Slug</TableHead>
+                    <TableHead>Products</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                {/* {categories.map((category) => (
+                    <React.Fragment key={category.id}>
+                      {renderCategoryRow(category)}
+                      {category.children?.map((child) => renderCategoryRow(child, true))}
+                    </React.Fragment>
+                  ))} */}
+                  {categories
+                    .filter(category => !category.parentId) // Only show parent categories
+                    .map((category) => (
+                      <React.Fragment key={category.id}>
+                        {renderCategoryRow(category)}
+                        {category.children?.map((child) => renderCategoryRow(child, true))}
+                      </React.Fragment>
+                    ))}
+                </TableBody>
+              </Table>
+              
+              {categories.filter(category => !category.parentId).length === 0 && !loading && (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No categories found. Create your first category to get started.</p>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
