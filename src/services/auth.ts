@@ -9,20 +9,20 @@ const API_BASE_URL = "http://46.101.174.239:8082/api";
 
 // Token management utilities
 export const tokenManager = {
-  setToken: (token: string) => {
-    localStorage.setItem('auth_token', token);
+  setAdminToken: (token: string) => {
+    sessionStorage.setItem('auth_token', token);
   },
   
-  getToken: (): string | null => {
-    return localStorage.getItem('auth_token');
+  getAdminToken: (): string | null => {
+    return sessionStorage.getItem('auth_token');
   },
   
-  removeToken: () => {
-    localStorage.removeItem('auth_token');
+  removeAdminToken: () => {
+    sessionStorage.removeItem('auth_token');
   },
   
-  isTokenValid: (): boolean => {
-    const token = localStorage.getItem('auth_token');
+  isAdminTokenValid: (): boolean => {
+    const token = sessionStorage.getItem('auth_token');
     if (!token) return false;
     
     try {
@@ -34,6 +34,69 @@ export const tokenManager = {
       return false;
     }
   }
+};
+
+const keys: (keyof AuthUser)[] = [
+  "id",
+  "name",
+  "email",
+  "phoneNumber",
+  "userType",
+];
+
+export const infoManager = {
+  getAdminInfo: (): AuthUser | null => {
+    const data: Partial<AuthUser> = {};
+    for (const key of keys) {
+      const value = sessionStorage.getItem(`admin_${key}`);
+      if (!value) return null; // If any field is missing → consider not logged in
+      if (key === "userType") {
+        if (value !== "ADMIN" && value !== "CUSTOMER") return null; // invalid value
+        data[key] = value as AuthUser["userType"];
+      } else {
+        data[key] = value as string;
+      }    }
+    return data as AuthUser;
+  },
+
+  setAdminInfo: (info: AuthUser) => {
+    for (const key of keys) {
+      sessionStorage.setItem(`admin_${key}`, info[key]);
+    }
+  },
+
+  removeAdminInfo: () => {
+    for (const key of keys) {
+      sessionStorage.removeItem(`admin_${key}`);
+    }
+  },
+
+  getCustomerInfo: (): AuthUser | null => {
+    const data: Partial<AuthUser> = {};
+    for (const key of keys) {
+      const value = localStorage.getItem(`customer_${key}`);
+      if (!value) return null; // If any field is missing → consider not logged in
+      if (key === "userType") {
+        if (value !== "ADMIN" && value !== "CUSTOMER") return null; // invalid value
+        data[key] = value as AuthUser["userType"];
+      } else {
+        data[key] = value as string;
+      }
+    }
+    return data as AuthUser;
+  },
+
+  setCustomerInfo: (info: AuthUser) => {
+    for (const key of keys) {
+      localStorage.setItem(`customer_${key}`, info[key]);
+    }
+  },
+
+  removeCustomerInfo: () => {
+    for (const key of keys) {
+      localStorage.removeItem(`customer_${key}`);
+    }
+  },
 };
 
 export class AuthService {
@@ -62,8 +125,8 @@ export class AuthService {
       const user = result.data.user;
       const token = result.data.token;
 
-      // Store token in localStorage
-      tokenManager.setToken(token);
+      // Store token in sessionStorage
+      tokenManager.setAdminToken(token);
 
       return {
         user: {
@@ -131,7 +194,7 @@ export class AuthService {
 
 
   static async logout(): Promise<void> {
-    const token = tokenManager.getToken();
+    const token = tokenManager.getAdminToken();
     
     const response = await fetch(`${API_BASE_URL}/users-auth/logout`, {
       method: "POST",
@@ -153,8 +216,8 @@ export class AuthService {
       throw new Error(result.message?.en || result.message || "Logout failed");
     }
     
-    // Clear token from localStorage
-    tokenManager.removeToken();
+    // Clear token from sessionStorage
+    tokenManager.removeAdminToken();
   }
 
 }

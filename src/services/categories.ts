@@ -6,7 +6,7 @@ const API_BASE_URL = 'http://46.101.174.239:8082/api';
 class CategoriesService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    const token = tokenManager.getToken();
+    const token = tokenManager.getAdminToken();
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -53,7 +53,11 @@ class CategoriesService {
     }
 
     const responseData = await response.json();
+    if (responseData.success) {
     console.log('✅ Success Response Data:', responseData);
+    } else {
+      console.log('❌ [NON-SUCCESS] Response Data:', responseData);
+    }
     return responseData;
   }
 
@@ -76,44 +80,45 @@ class CategoriesService {
   /**
    * Get a single category by ID
    */
-  async getCategoryById(id: number): Promise<Category> {
-    const response = await this.request<{ success: boolean; data: Category }>(`/categories/${id}`);
-    return response.data;
+  async getCategoryById(id: number): Promise<{ success: boolean; data: Category; message?: { en: string; ar: string } }> {
+    const response = await this.request<{ success: boolean; data: Category; message?: { en: string; ar: string } }>(`/categories/${id}`);
+    return response;
   }
 
   /**
    * Create a new category
    */
-  async createCategory(categoryData: CreateCategoryRequest): Promise<Category> {
+  async createCategory(categoryData: CreateCategoryRequest): Promise<{ success: boolean; data: Category; message?: { en: string; ar: string } }> {
     console.log('📝 Creating category with data:', categoryData);
     
-    const response = await this.request<{ success: boolean; data: Category }>('/categories', {
+    const response = await this.request<{ success: boolean; data: Category; message?: { en: string; ar: string } }>('/categories', {
       method: 'POST',
       body: JSON.stringify(categoryData),
     });
     
     console.log('📝 Create category response:', response);
-    return response.data;
+    return response;
   }
 
   /**
    * Update an existing category
    */
-  async updateCategory(id: number, categoryData: UpdateCategoryRequest): Promise<Category> {
-    const response = await this.request<{ success: boolean; data: Category }>(`/categories/${id}`, {
-      method: 'PUT',
+  async updateCategory(id: number, categoryData: UpdateCategoryRequest): Promise<{ success: boolean; data: Category; message?: { en: string; ar: string } }> {
+    const response = await this.request<{ success: boolean; data: Category; message?: { en: string; ar: string } }>(`/categories/${id}`, {
+      method: 'PATCH',
       body: JSON.stringify(categoryData),
     });
-    return response.data;
+    return response;
   }
 
   /**
    * Delete a category
    */
-  async deleteCategory(id: number): Promise<void> {
-    await this.request(`/categories/${id}`, {
+  async deleteCategory(id: number): Promise<{ success: boolean; message?: { en: string; ar: string } }> {
+    const response = await this.request<{ success: boolean; message?: { en: string; ar: string } }>(`/categories/${id}`, {
       method: 'DELETE',
     });
+    return response;
   }
 
   /**

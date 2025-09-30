@@ -14,6 +14,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { categoriesService } from "@/services/categories";
 import { Category, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/category";
 import { categoryFormSchema, categorySchema, CategoryFormData, CategoryData } from "@/schemas/category";
+import { generateSlug } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -22,12 +24,15 @@ export default function Categories() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       name: "",
-      slug: "",
       parentId: ""
     }
   });
@@ -57,31 +62,51 @@ export default function Categories() {
       // Transform form data using the schema
       const data: CategoryData = categorySchema.parse(formData);
       
+      // Generate slug from name
+      const slug = generateSlug(data.name);
+      
+      let response;
       if (editingCategory) {
-        // Update category
+        // Update category (exclude parentId for edit)
         const updateData: UpdateCategoryRequest = {
           name: data.name,
-          slug: data.slug,
-          ...(data.parentId !== null && { parentId: data.parentId })
+          slug: slug
         };
-        await categoriesService.updateCategory(editingCategory.id, updateData);
+        response = await categoriesService.updateCategory(editingCategory.id, updateData);
       } else {
         // Create new category
         const createData: CreateCategoryRequest = {
           name: data.name,
-          slug: data.slug,
+          slug: slug,
           ...(data.parentId !== null && { parentId: data.parentId })
         };
-        await categoriesService.createCategory(createData);
+        response = await categoriesService.createCategory(createData);
       }
       
-      // Reload categories after successful operation
-      await loadCategories();
-      setIsDialogOpen(false);
-      setEditingCategory(null);
-      form.reset();
+      // Handle response based on success status
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: response.message?.en || (editingCategory ? "Category updated successfully" : "Category created successfully"),
+        });
+        // Reload categories after successful operation
+        await loadCategories();
+        handleDialogClose();
+      } else {
+        toast({
+          title: "Error",
+          description: response.message?.en || "Operation failed",
+          variant: "destructive",
+        });
+        // Don't close the dialog on failure
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save category');
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to save category',
+        variant: "destructive",
+      });
+      // Don't close the dialog on error
     } finally {
       setSubmitting(false);
     }
@@ -89,25 +114,71 @@ export default function Categories() {
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
+    // Reset form with the category data
     form.reset({
       name: category.name,
-      slug: category.slug,
       parentId: category.parentId?.toString() || ""
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (categoryId: number) => {
-    if (confirm("Are you sure you want to delete this category? This action cannot be undone.")) {
-      try {
-        setLoading(true);
-        await categoriesService.deleteCategory(categoryId);
+  const handleCreate = () => {
+    setEditingCategory(null);
+    // Reset form to default values for create
+    form.reset({
+      name: "",
+      parentId: ""
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = () => {
+    setIsDialogOpen(false);
+    setEditingCategory(null);
+    // Always reset form when closing dialog
+    form.reset({
+      name: "",
+      parentId: ""
+    });
+  };
+
+  const handleDeleteClick = (category: Category) => {
+    setCategoryToDelete(category);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!categoryToDelete) return;
+    
+    setDeleting(true);
+    try {
+      const response = await categoriesService.deleteCategory(categoryToDelete.id);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Category deleted successfully",
+        });
         await loadCategories();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete category');
-      } finally {
-        setLoading(false);
+        setDeleteDialogOpen(false);
+        setCategoryToDelete(null);
+      } else {
+        toast({
+          title: "Error",
+          description: response.message?.en || "Failed to delete category",
+          variant: "destructive",
+        });
+        // Don't close the dialog on failure
       }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to delete category',
+        variant: "destructive",
+      });
+      // Don't close the dialog on error
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -129,7 +200,7 @@ export default function Categories() {
           <Button variant="ghost" size="icon" onClick={() => handleEdit(category)}>
             <Edit className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => handleDelete(category.id)}>
+          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(category)}>
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
@@ -148,9 +219,16 @@ export default function Categories() {
           </p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            handleDialogClose();
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
+            <Button 
+              className="bg-gradient-primary hover:opacity-90"
+              onClick={handleCreate}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Category
             </Button>
@@ -180,57 +258,38 @@ export default function Categories() {
                   )}
                 />
                 
-                <FormField
-                  control={form.control}
-                  name="slug"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category Slug</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter category slug (e.g., movies, games)..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="parentId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Parent Category (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="-- Select Parent Category --" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {categories.filter(cat => !cat.parentId).map((cat) => (
-                            <SelectItem key={cat.id} value={cat.id.toString()}>
-                              {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {!editingCategory && (
+                  <FormField
+                    control={form.control}
+                    name="parentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Parent Category (Optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="-- Select Parent Category --" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories.filter(cat => !cat.parentId).map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id.toString()}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <div className="flex justify-end gap-3 pt-4">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      setEditingCategory(null);
-                      form.reset();
-                    }}
+                    onClick={handleDialogClose}
                   >
                     Cancel
                   </Button>
@@ -248,6 +307,46 @@ export default function Categories() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              Delete Category
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete the category <strong>"{categoryToDelete?.name}"</strong>? 
+              This action cannot be undone and will also delete all subcategories.
+            </p>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setCategoryToDelete(null);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button"
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Delete Category
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Error Alert */}
       {error && (

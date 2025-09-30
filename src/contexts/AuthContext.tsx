@@ -133,21 +133,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    tokenManager.removeToken();
+    tokenManager.removeAdminToken();
     dispatch({ type: 'LOGOUT' });
   };
 
   // Initialize authentication state from localStorage
   useEffect(() => {
-    const token = tokenManager.getToken();
-    if (token && tokenManager.isTokenValid()) {
+    const token = tokenManager.getAdminToken();
+    if (token && tokenManager.isAdminTokenValid()) {
       // Token exists and is valid, but we need to get user info
       // For now, we'll just set authenticated to true
       // In a real app, you might want to validate the token with the server
       dispatch({ type: 'SET_USER', payload: null }); // User info would come from token or API call
     } else if (token) {
       // Token exists but is invalid, remove it
-      tokenManager.removeToken();
+      tokenManager.removeAdminToken();
     }
   }, []);
 
