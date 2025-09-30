@@ -1,24 +1,60 @@
 import { Category, CategoryResponse, CreateCategoryRequest, UpdateCategoryRequest, CategoryFilters } from '@/types/category';
+import { tokenManager } from '@/services/auth';
 
 const API_BASE_URL = 'http://46.101.174.239:8082/api';
 
 class CategoriesService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+    const token = tokenManager.getToken();
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    
+    // Add Authorization header if token exists
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    // Console log the request details
+    console.log('🚀 API Request:', {
+      method: options.method || 'GET',
+      url: url,
+      headers: headers,
+      body: options.body ? (typeof options.body === 'string' ? JSON.parse(options.body) : options.body) : undefined
+    });
     
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     });
 
+    // Console log the response details
+    console.log('📥 API Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: response.url
+    });
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // Try to get error details from response
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        console.log('❌ Error Response Data:', errorData);
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch (e) {
+        console.log('❌ Could not parse error response as JSON');
+      }
+      throw new Error(errorMessage);
     }
 
-    return response.json();
+    const responseData = await response.json();
+    console.log('✅ Success Response Data:', responseData);
+    return responseData;
   }
 
   /**
@@ -49,10 +85,14 @@ class CategoriesService {
    * Create a new category
    */
   async createCategory(categoryData: CreateCategoryRequest): Promise<Category> {
+    console.log('📝 Creating category with data:', categoryData);
+    
     const response = await this.request<{ success: boolean; data: Category }>('/categories', {
       method: 'POST',
       body: JSON.stringify(categoryData),
     });
+    
+    console.log('📝 Create category response:', response);
     return response.data;
   }
 

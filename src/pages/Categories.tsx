@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Plus, Edit, Trash2, Folder, FolderOpen, Loader2, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { categoriesService } from "@/services/categories";
 import { Category, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/category";
+import { categoryFormSchema, categorySchema, CategoryFormData, CategoryData } from "@/schemas/category";
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -17,8 +21,16 @@ export default function Categories() {
   const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({ name: "", parentId: "" });
   const [submitting, setSubmitting] = useState(false);
+
+  const form = useForm<CategoryFormData>({
+    resolver: zodResolver(categoryFormSchema),
+    defaultValues: {
+      name: "",
+      slug: "",
+      parentId: ""
+    }
+  });
 
   // Load categories on component mount
   useEffect(() => {
@@ -38,23 +50,27 @@ export default function Categories() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (formData: CategoryFormData) => {
     setSubmitting(true);
     
     try {
+      // Transform form data using the schema
+      const data: CategoryData = categorySchema.parse(formData);
+      
       if (editingCategory) {
         // Update category
         const updateData: UpdateCategoryRequest = {
-          name: formData.name,
-          parentId: formData.parentId ? parseInt(formData.parentId) : null
+          name: data.name,
+          slug: data.slug,
+          ...(data.parentId !== null && { parentId: data.parentId })
         };
         await categoriesService.updateCategory(editingCategory.id, updateData);
       } else {
         // Create new category
         const createData: CreateCategoryRequest = {
-          name: formData.name,
-          parentId: formData.parentId ? parseInt(formData.parentId) : null
+          name: data.name,
+          slug: data.slug,
+          ...(data.parentId !== null && { parentId: data.parentId })
         };
         await categoriesService.createCategory(createData);
       }
@@ -63,7 +79,7 @@ export default function Categories() {
       await loadCategories();
       setIsDialogOpen(false);
       setEditingCategory(null);
-      setFormData({ name: "", parentId: "" });
+      form.reset();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save category');
     } finally {
@@ -73,9 +89,10 @@ export default function Categories() {
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    setFormData({ 
-      name: category.name, 
-      parentId: category.parentId?.toString() || "" 
+    form.reset({
+      name: category.name,
+      slug: category.slug,
+      parentId: category.parentId?.toString() || ""
     });
     setIsDialogOpen(true);
   };
@@ -144,57 +161,90 @@ export default function Categories() {
                 {editingCategory ? "Edit Category" : "Create New Category"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Category Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter category name..."
-                  required
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter category name..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              
-              <div>
-                <Label htmlFor="parent">Parent Category (Optional)</Label>
-                <select
-                  id="parent"
-                  value={formData.parentId}
-                  onChange={(e) => setFormData({ ...formData, parentId: e.target.value })}
-                  className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="">-- Select Parent Category --</option>
-                  {categories.filter(cat => !cat.parentId).map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                
+                <FormField
+                  control={form.control}
+                  name="slug"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category Slug</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter category slug (e.g., movies, games)..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="parentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parent Category (Optional)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="-- Select Parent Category --" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categories.filter(cat => !cat.parentId).map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id.toString()}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    setEditingCategory(null);
-                    setFormData({ name: "", parentId: "" });
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  className="bg-gradient-primary hover:opacity-90"
-                  disabled={submitting}
-                >
-                  {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {editingCategory ? "Update" : "Create"}
-                </Button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsDialogOpen(false);
+                      setEditingCategory(null);
+                      form.reset();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    className="bg-gradient-primary hover:opacity-90"
+                    disabled={submitting}
+                  >
+                    {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {editingCategory ? "Update" : "Create"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>

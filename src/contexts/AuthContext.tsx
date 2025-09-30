@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { AuthState, AuthUser, AuthModalMode } from '@/types/auth';
+import { tokenManager } from '@/services/auth';
 
 interface AuthContextType extends AuthState {
   openAuthModal: (mode?: AuthModalMode) => void;
@@ -13,6 +14,7 @@ interface AuthContextType extends AuthState {
   qrCodeUrl: string | null;
   manualKey: string | null;
   setQRCode: (qrCodeUrl: string | null, manualKey?: string | null) => void;
+  logout: () => void;
 }
 
 type AuthAction =
@@ -22,7 +24,8 @@ type AuthAction =
   | { type: 'CLEAR_ERROR' }
   | { type: 'OPEN_AUTH_MODAL'; payload: AuthModalMode }
   | { type: 'CLOSE_AUTH_MODAL' }
-  | { type: 'SET_QR_CODE'; payload: { qrCodeUrl: string | null; manualKey?: string | null } };
+  | { type: 'SET_QR_CODE'; payload: { qrCodeUrl: string | null; manualKey?: string | null } }
+  | { type: 'LOGOUT' };
 
 const initialState: AuthState & { authModalOpen: boolean; authModalMode: AuthModalMode; qrCodeUrl: string | null; manualKey: string | null } = {
   user: null,
@@ -82,6 +85,15 @@ function authReducer(
         qrCodeUrl: action.payload.qrCodeUrl,
         manualKey: action.payload.manualKey || null,
       };
+    case 'LOGOUT':
+      return {
+        ...state,
+        user: null,
+        isAuthenticated: false,
+        error: null,
+        qrCodeUrl: null,
+        manualKey: null,
+      };
     default:
       return state;
   }
@@ -120,6 +132,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_QR_CODE', payload: { qrCodeUrl, manualKey } });
   };
 
+  const logout = () => {
+    tokenManager.removeToken();
+    dispatch({ type: 'LOGOUT' });
+  };
+
+  // Initialize authentication state from localStorage
+  useEffect(() => {
+    const token = tokenManager.getToken();
+    if (token && tokenManager.isTokenValid()) {
+      // Token exists and is valid, but we need to get user info
+      // For now, we'll just set authenticated to true
+      // In a real app, you might want to validate the token with the server
+      dispatch({ type: 'SET_USER', payload: null }); // User info would come from token or API call
+    } else if (token) {
+      // Token exists but is invalid, remove it
+      tokenManager.removeToken();
+    }
+  }, []);
+
   const value: AuthContextType = {
     ...state,
     openAuthModal,
@@ -129,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError,
     clearError,
     setQRCode,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

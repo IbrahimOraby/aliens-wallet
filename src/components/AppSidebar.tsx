@@ -41,7 +41,7 @@ export function AppSidebar() {
             </div>
             {!isCollapsed && (
               <div>
-                <h2 className="text-lg font-semibold text-foreground">GiftHub</h2>
+                <h2 className="text-lg font-semibold text-foreground">Aliens Wallet</h2>
                 <p className="text-sm text-muted-foreground">Admin Dashboard</p>
               </div>
             )}
@@ -60,7 +60,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavClassName}>
                       <item.icon className="w-5 h-5 flex-shrink-0" />
-                      {!isCollapsed && <span>{item.title}</span>}
+                      {!isCollapsed && <span className="">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

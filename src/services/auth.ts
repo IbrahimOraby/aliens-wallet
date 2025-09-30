@@ -7,10 +7,39 @@ import {
 
 const API_BASE_URL = "http://46.101.174.239:8082/api";
 
+// Token management utilities
+export const tokenManager = {
+  setToken: (token: string) => {
+    localStorage.setItem('auth_token', token);
+  },
+  
+  getToken: (): string | null => {
+    return localStorage.getItem('auth_token');
+  },
+  
+  removeToken: () => {
+    localStorage.removeItem('auth_token');
+  },
+  
+  isTokenValid: (): boolean => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return false;
+    
+    try {
+      // Decode JWT to check expiration
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const now = Math.floor(Date.now() / 1000);
+      return payload.exp > now;
+    } catch {
+      return false;
+    }
+  }
+};
+
 export class AuthService {
   static async login(
     data: LoginFormData
-  ): Promise<{ user: AuthUser; requiresOTP: boolean }> {
+  ): Promise<{ user: AuthUser; requiresOTP: boolean; token: string }> {
     const response = await fetch(`${API_BASE_URL}/users-auth/login`, {
       method: "POST",
       headers: {
@@ -31,6 +60,10 @@ export class AuthService {
     // Handle the actual API response format
     if (result.success && result.data) {
       const user = result.data.user;
+      const token = result.data.token;
+
+      // Store token in localStorage
+      tokenManager.setToken(token);
 
       return {
         user: {
@@ -40,7 +73,8 @@ export class AuthService {
           phoneNumber: user.phoneNumber,
           userType: user.userType
         },
-        requiresOTP: user.userType === "ADMIN" && user.twofaEnabled
+        requiresOTP: user.userType === "ADMIN" && user.twofaEnabled,
+        token: token
       };
     }
 
@@ -97,8 +131,14 @@ export class AuthService {
 
 
   static async logout(): Promise<void> {
+    const token = tokenManager.getToken();
+    
     const response = await fetch(`${API_BASE_URL}/users-auth/logout`, {
-      method: "POST"
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
     });
 
     if (!response.ok) {
@@ -112,6 +152,9 @@ export class AuthService {
     if (!result.success) {
       throw new Error(result.message?.en || result.message || "Logout failed");
     }
+    
+    // Clear token from localStorage
+    tokenManager.removeToken();
   }
 
 }

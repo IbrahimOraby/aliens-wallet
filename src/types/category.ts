@@ -23,11 +23,13 @@ export interface CategoryResponse {
 
 export interface CreateCategoryRequest {
   name: string;
+  slug: string;
   parentId?: number | null;
 }
 
 export interface UpdateCategoryRequest {
   name?: string;
+  slug?: string;
   parentId?: number | null;
 }
 

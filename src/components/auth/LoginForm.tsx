@@ -18,7 +18,7 @@ interface LoginFormProps {
 
 export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-  const { setLoading, setError, clearError } = useAuth();
+  const { setLoading, setError, clearError, setUser, closeAuthModal } = useAuth();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -38,13 +38,19 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
       
       const result = await AuthService.login(loginData);
       
+      // Set user in auth context
+      setUser(result.user);
+      
+      // Close the auth modal
+      closeAuthModal();
+      
       // Handle successful login based on user type
       if (result.user.userType === 'ADMIN') {
-        // TODO: Navigate to /admin
         console.log('Admin login successful', result.user);
+        window.location.href = '/admin';
       } else {
-        // TODO: Navigate to /store
         console.log('Customer login successful', result.user);
+        window.location.href = '/store';
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Login failed');
