@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import { AuthState, AuthUser, AuthModalMode } from '@/types/auth';
-import { tokenManager } from '@/services/auth';
+import { tokenManager, infoManager } from '@/services/auth';
 
 interface AuthContextType extends AuthState {
   openAuthModal: (mode?: AuthModalMode) => void;
@@ -30,7 +30,7 @@ type AuthAction =
 const initialState: AuthState & { authModalOpen: boolean; authModalMode: AuthModalMode; qrCodeUrl: string | null; manualKey: string | null } = {
   user: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true, // Start with loading true to prevent premature redirects
   error: null,
   authModalOpen: false,
   authModalMode: 'login',
@@ -48,6 +48,7 @@ function authReducer(
         ...state,
         user: action.payload,
         isAuthenticated: !!action.payload,
+        isLoading: false, // Set loading to false when user is set
       };
     case 'SET_LOADING':
       return {
@@ -133,21 +134,64 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    tokenManager.removeAdminToken();
+    console.log('🚪 Logging out user:', state.user);
+    
+    // Clear data based on user type
+    if (state.user?.userType === 'ADMIN') {
+      // Clear admin data (sessionStorage)
+      console.log('🧹 Clearing admin sessionStorage data');
+      tokenManager.removeAdminToken();
+      infoManager.removeAdminInfo();
+    } else if (state.user?.userType === 'CUSTOMER') {
+      // Clear customer data (localStorage)
+      console.log('🧹 Clearing customer localStorage data');
+      infoManager.removeCustomerInfo();
+    } else {
+      // Clear both if user type is unknown (safety measure)
+      console.log('🧹 Clearing all data (unknown user type)');
+      tokenManager.removeAdminToken();
+      infoManager.removeAdminInfo();
+      infoManager.removeCustomerInfo();
+    }
+    
     dispatch({ type: 'LOGOUT' });
   };
 
-  // Initialize authentication state from localStorage
+  // Initialize authentication state from localStorage/sessionStorage
   useEffect(() => {
-    const token = tokenManager.getAdminToken();
-    if (token && tokenManager.isAdminTokenValid()) {
-      // Token exists and is valid, but we need to get user info
-      // For now, we'll just set authenticated to true
-      // In a real app, you might want to validate the token with the server
-      dispatch({ type: 'SET_USER', payload: null }); // User info would come from token or API call
-    } else if (token) {
-      // Token exists but is invalid, remove it
+    console.log('🔍 Initializing auth state...');
+    
+    // Check for admin user first (sessionStorage)
+    const adminToken = tokenManager.getAdminToken();
+    console.log('🔑 Auth token (auth_token) exists:', !!adminToken);
+    
+    if (adminToken && tokenManager.isAdminTokenValid()) {
+      const adminInfo = infoManager.getAdminInfo();
+      console.log('👤 Admin info found:', adminInfo);
+      if (adminInfo) {
+        dispatch({ type: 'SET_USER', payload: adminInfo });
+        return;
+      } else {
+        // Token exists but no user info, clean up
+        console.log('🧹 Cleaning up invalid admin data');
+        tokenManager.removeAdminToken();
+        infoManager.removeAdminInfo();
+      }
+    } else if (adminToken) {
+      // Token exists but is invalid, clean up
+      console.log('🧹 Cleaning up invalid admin token');
       tokenManager.removeAdminToken();
+      infoManager.removeAdminInfo();
+    }
+
+    // Check for customer user (localStorage)
+    const customerInfo = infoManager.getCustomerInfo();
+    console.log('👤 Customer info found:', customerInfo);
+    if (customerInfo) {
+      dispatch({ type: 'SET_USER', payload: customerInfo });
+    } else {
+      // If no user found, set loading to false
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, []);
 

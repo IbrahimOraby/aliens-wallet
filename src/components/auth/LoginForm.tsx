@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { loginSchema } from '@/schemas/auth';
 import { LoginFormData } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
-import { AuthService } from '@/services/auth';
+import { AuthService, infoManager } from '@/services/auth';
 
 interface LoginFormProps {
   onSwitchToSignup: () => void;
@@ -37,6 +37,13 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
       };
       
       const result = await AuthService.login(loginData);
+      
+      // Store user info in sessionStorage/localStorage based on user type
+      if (result.user.userType === 'ADMIN') {
+        infoManager.setAdminInfo(result.user);
+      } else {
+        infoManager.setCustomerInfo(result.user);
+      }
       
       // Set user in auth context
       setUser(result.user);

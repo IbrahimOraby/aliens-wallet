@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { CustomerProtectedRoute } from "@/components/CustomerProtectedRoute";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StoreLayout } from "@/components/StoreLayout";
 import Overview from "@/pages/Overview";
@@ -12,6 +14,8 @@ import Orders from "@/pages/Orders";
 import Categories from "@/pages/Categories";
 import Specifications from "@/pages/Specifications";
 import Products from "@/pages/Products";
+import Unauthorized from "@/pages/Unauthorized";
+import AdminUnauthorized from "@/pages/AdminUnauthorized";
 import Homepage from "@/pages/store/Homepage";
 import Shop from "@/pages/store/Shop";
 import ProductDetails from "@/pages/store/ProductDetails";
@@ -26,7 +30,11 @@ const queryClient = new QueryClient();
 const router = createBrowserRouter([
   {
     path: "/admin",
-    element: <DashboardLayout><Outlet /></DashboardLayout>,
+    element: (
+      <ProtectedRoute requiredUserType="ADMIN">
+        <DashboardLayout><Outlet /></DashboardLayout>
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -56,7 +64,11 @@ const router = createBrowserRouter([
   },
   {
     path: "/store",
-    element: <StoreLayout><Outlet /></StoreLayout>,
+    element: (
+      <CustomerProtectedRoute>
+        <StoreLayout><Outlet /></StoreLayout>
+      </CustomerProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -90,7 +102,19 @@ const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: <StoreLayout><Homepage /></StoreLayout>,
+    element: (
+      <CustomerProtectedRoute>
+        <StoreLayout><Homepage /></StoreLayout>
+      </CustomerProtectedRoute>
+    ),
+  },
+  {
+    path: "/unauthorized",
+    element: <Unauthorized />,
+  },
+  {
+    path: "/admin-unauthorized",
+    element: <AdminUnauthorized />,
   },
   {
     path: "*",

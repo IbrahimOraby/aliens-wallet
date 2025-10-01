@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/contexts/AuthContext";
-import { AuthService } from "@/services/auth";
 
 export const StoreHeader = () => {
   const { items } = useCart();
-  const { openAuthModal, isAuthenticated, user, setUser, setError } = useAuth();
+  const { openAuthModal, isAuthenticated, user, logout } = useAuth();
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleLogout = async () => {
-    try {
-      await AuthService.logout();
-      setUser(null);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Logout failed');
-    }
+  const handleLogout = () => {
+    logout();
+    // Redirect to home page after logout
+    window.location.href = '/';
   };
 
   return (

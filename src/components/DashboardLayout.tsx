@@ -1,14 +1,22 @@
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { logout, user } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <SidebarProvider defaultOpen={true}>
@@ -38,9 +46,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full"></span>
                   </Button>
                   
-                  <Button variant="ghost" size="icon">
-                    <User className="w-5 h-5" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground hidden sm:block">
+                      {user?.name || 'Admin'}
+                    </span>
+                    <Button variant="ghost" size="icon">
+                      <User className="w-5 h-5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
+                      <LogOut className="w-5 h-5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </header>

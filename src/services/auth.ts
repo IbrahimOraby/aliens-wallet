@@ -193,31 +193,7 @@ export class AuthService {
   }
 
 
-  static async logout(): Promise<void> {
-    const token = tokenManager.getAdminToken();
-    
-    const response = await fetch(`${API_BASE_URL}/users-auth/logout`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message?.en || errorData.message || "Logout failed"
-      );
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.message?.en || result.message || "Logout failed");
-    }
-    
-    // Clear token from sessionStorage
-    tokenManager.removeAdminToken();
-  }
+  // Note: Logout is now handled client-side by clearing sessionStorage/localStorage
+  // No API call needed for logout
 
 }
