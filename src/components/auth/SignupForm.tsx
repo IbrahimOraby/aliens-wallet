@@ -31,6 +31,7 @@ import { signupSchema } from "@/schemas/auth";
 import { SignupFormData } from "@/types/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { AuthService } from "@/services/auth";
+import { useToast } from "@/hooks/use-toast";
 
 interface SignupFormProps {
   onSwitchToLogin: () => void;
@@ -43,6 +44,7 @@ export function SignupForm({
 }: SignupFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { setLoading, setError, clearError, setQRCode } = useAuth();
+  const { toast } = useToast();
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -70,18 +72,35 @@ export function SignupForm({
       const result = await AuthService.signup(signupData);
 
       if (result.requiresOTP) {
+        // Show success toast for admin signup
+        toast({
+          title: "Account Created Successfully",
+          description: `Welcome ${result.user.name}! Please complete 2FA setup to continue.`,
+        });
+        
         // If admin or requires OTP, store QR code and show OTP form
         if (result.qrCodeUrl) {
           setQRCode(result.qrCodeUrl, result.manualKey);
         }
         onSwitchToOTP(result.user.userType);
       } else {
-        // If customer, navigate to store
-        // TODO: Handle customer signup success - navigate to /store
-        console.log("Customer signup successful", result.user);
+        // Show success toast for customer signup
+        toast({
+          title: "Account Created Successfully",
+          description: `Welcome ${result.user.name}! Please sign in to continue.`,
+        });
+        
+        // If customer, switch to login form
+        onSwitchToLogin();
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Signup failed");
+      // Show error message using toast
+      const errorMessage = error instanceof Error ? error.message : "Signup failed";
+      toast({
+        title: "Signup Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

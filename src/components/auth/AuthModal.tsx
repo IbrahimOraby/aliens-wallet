@@ -30,13 +30,8 @@ export function AuthModal() {
 
   const handleBack = () => {
     if (currentMode === "otp") {
-      if (userType === "ADMIN") {
-        // Admin users go back to login after QR setup
-        setCurrentMode("login");
-      } else {
-        // Customer users go back to signup
-        setCurrentMode("signup");
-      }
+      // Both admin and customer users go to login after OTP setup
+      setCurrentMode("login");
     } else {
       setCurrentMode("login");
     }
@@ -98,18 +93,30 @@ export function AuthModal() {
   };
 
   return (
-    <Dialog open={authModalOpen} onOpenChange={closeAuthModal}>
+    <Dialog 
+      open={authModalOpen} 
+      onOpenChange={(open) => {
+        // Prevent closing if in OTP mode for ADMIN users
+        if (!open && currentMode === "otp" && userType === "ADMIN") {
+          return;
+        }
+        closeAuthModal();
+      }}
+    >
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-end mb-4">
           {/* <h2 className="text-lg font-semibold">{getModalTitle()}</h2> */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={closeAuthModal}
-            className="h-6 w-6"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {/* Only show close button if not in OTP mode for ADMIN users */}
+          {!(currentMode === "otp" && userType === "ADMIN") && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={closeAuthModal}
+              className="h-6 w-6"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         {/* TODO: Add error message in toast*/}

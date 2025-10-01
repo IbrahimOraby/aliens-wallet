@@ -10,6 +10,7 @@ import { loginSchema } from '@/schemas/auth';
 import { LoginFormData } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthService, infoManager } from '@/services/auth';
+import { useToast } from '@/hooks/use-toast';
 
 interface LoginFormProps {
   onSwitchToSignup: () => void;
@@ -18,11 +19,21 @@ interface LoginFormProps {
 
 export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const [requiresTOTP, setRequiresTOTP] = useState(false);
   const { setLoading, setError, clearError, setUser, closeAuthModal } = useAuth();
+  const { toast } = useToast();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+
+  // Reset TOTP requirement when user changes email or password
+  const resetTOTPRequirement = () => {
+    if (requiresTOTP) {
+      setRequiresTOTP(false);
+      form.setValue('totp', '');
+    }
+  };
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -48,6 +59,12 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
       // Set user in auth context
       setUser(result.user);
       
+      // Show success toast
+      toast({
+        title: "Login Successful",
+        description: `Welcome back, ${result.user.name}!`,
+      });
+      
       // Close the auth modal
       closeAuthModal();
       
@@ -60,7 +77,23 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
         window.location.href = '/store';
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Login failed');
+      // Check if the error indicates TOTP is required
+      const errorMessage = error instanceof Error ? error.message : 'Login failed';
+      
+      if (errorMessage.includes('Two-factor authentication code (TOTP) is required for admin users') || 
+          errorMessage.includes('مطلوب رمز المصادقة الثنائية للمسؤولين')) {
+        // Show TOTP field and don't show error message
+        setRequiresTOTP(true);
+        clearError();
+      } else {
+        // Show the error message using toast
+        toast({
+          title: "Login Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+        setRequiresTOTP(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -88,6 +121,10 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
                       type="email"
                       placeholder="Enter your email"
                       {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        resetTOTPRequirement();
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -108,6 +145,10 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
                                 placeholder="Enter your password"
                                 {...field}
                                 className="pr-10"
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  resetTOTPRequirement();
+                                }}
                               />
                               <Button
                                 type="button"
@@ -129,30 +170,35 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="totp"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>TOTP (required only for admins)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="text"
-                              placeholder="000000"
-                              maxLength={6}
-                              className="text-center text-lg tracking-widest font-mono"
-                              {...field}
-                              onChange={(e) => {
-                                // Only allow numbers
-                                const value = e.target.value.replace(/\D/g, '');
-                                field.onChange(value);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {requiresTOTP && (
+                      <FormField
+                        control={form.control}
+                        name="totp"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>TOTP Code</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="000000"
+                                maxLength={6}
+                                className="text-center text-lg tracking-widest font-mono"
+                                {...field}
+                                onChange={(e) => {
+                                  // Only allow numbers
+                                  const value = e.target.value.replace(/\D/g, '');
+                                  field.onChange(value);
+                                }}
+                              />
+                            </FormControl>
+                            <p className="text-sm text-muted-foreground">
+                              Please enter the 6-digit code from your authenticator app
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
             <Button
               type="submit"
