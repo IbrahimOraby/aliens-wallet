@@ -12,6 +12,7 @@ import { Plus, Edit, Trash2, Folder, FolderOpen, Loader2, AlertCircle } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { categoriesService } from "@/services/categories";
+import { productsService } from "@/services/products";
 import { Category, CreateCategoryRequest, UpdateCategoryRequest } from "@/types/category";
 import { categoryFormSchema, categorySchema, CategoryFormData, CategoryData } from "@/schemas/category";
 import { generateSlug } from "@/lib/utils";
@@ -19,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Categories() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [productCounts, setProductCounts] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -37,10 +39,17 @@ export default function Categories() {
     }
   });
 
-  // Load categories on component mount
+  // Load categories and product counts on component mount
   useEffect(() => {
     loadCategories();
   }, []);
+
+  // Load product counts when categories change
+  useEffect(() => {
+    if (categories.length > 0) {
+      loadProductCounts();
+    }
+  }, [categories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadCategories = async () => {
     try {
@@ -53,6 +62,36 @@ export default function Categories() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadProductCounts = async () => {
+    try {
+      const counts: Record<number, number> = {};
+      
+      // Load all products to count usage
+      const productsResponse = await productsService.getProducts({ offset: 0, limit: 1000 });
+      const products = productsResponse.data;
+      
+      // Count products that use each category as either productTypeId or categoryId
+      categories.forEach(category => {
+        const count = products.filter(product => 
+          product.productTypeId === category.id || product.categoryId === category.id
+        ).length;
+        counts[category.id] = count;
+      });
+      
+      setProductCounts(counts);
+    } catch (err) {
+      console.error('Failed to load product counts:', err);
+      // Don't show error to user, just keep counts at 0
+    }
+  };
+
+  const getProductCountText = (categoryId: number) => {
+    const count = productCounts[categoryId] || 0;
+    if (count === 0) return "0 products";
+    if (count === 1) return "1 product";
+    return `${count} products`;
   };
 
   const onSubmit = async (formData: CategoryFormData) => {
@@ -89,8 +128,9 @@ export default function Categories() {
           title: "Success",
           description: response.message?.en || (editingCategory ? "Category updated successfully" : "Category created successfully"),
         });
-        // Reload categories after successful operation
+        // Reload categories and product counts after successful operation
         await loadCategories();
+        await loadProductCounts();
         handleDialogClose();
       } else {
         toast({
@@ -160,6 +200,7 @@ export default function Categories() {
           description: "Category deleted successfully",
         });
         await loadCategories();
+        await loadProductCounts();
         setDeleteDialogOpen(false);
         setCategoryToDelete(null);
       } else {
@@ -193,7 +234,7 @@ export default function Categories() {
       </TableCell>
       <TableCell className="font-mono text-sm text-muted-foreground">{category.slug}</TableCell>
       <TableCell>
-        <Badge variant="outline">0 products</Badge>
+        <Badge variant="outline">{getProductCountText(category.id)}</Badge>
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-2">

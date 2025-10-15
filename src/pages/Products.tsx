@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,142 +11,322 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Edit, Trash2, Package, Gift, Upload, Eye, X } from "lucide-react";
+import { Plus, Edit, Trash2, Package, Gift, Upload, Eye, X, Loader2, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { productsService } from "@/services/products";
+import { categoriesService } from "@/services/categories";
+import { regionsService } from "@/services/regions";
+import { Product, CreateProductRequest, UpdateProductRequest } from "@/types/product";
+import { Category } from "@/types/category";
+import { Region } from "@/types/region";
+import { productFormSchema, productSchema, ProductFormData, ProductData } from "@/schemas/product";
+import { useToast } from "@/hooks/use-toast";
 
-interface ProductVariation {
-  id: string;
-  specifications: Record<string, string>;
-  price: number;
-  stock: number;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  type: "gift_card" | "service";
-  category: string;
-  description: string;
-  basePrice: number;
-  status: "active" | "inactive";
-  variations: ProductVariation[];
-  codes?: string[]; // For gift cards
-  accountOptions?: "new" | "existing" | "both"; // For services
-}
+// Using Product type from the API types
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      name: "Netflix Gift Card",
-      type: "gift_card",
-      category: "Entertainment",
-      description: "Netflix streaming service gift card",
-      basePrice: 25.00,
-      status: "active",
-      variations: [
-        { id: "1-1", specifications: { amount: "$25" }, price: 25.00, stock: 50 },
-        { id: "1-2", specifications: { amount: "$50" }, price: 50.00, stock: 30 }
-      ],
-      codes: ["NFLX-ABC123", "NFLX-DEF456", "NFLX-GHI789"]
-    },
-    {
-      id: "2",
-      name: "Spotify Premium",
-      type: "service",
-      category: "Music",
-      description: "Spotify premium subscription service",
-      basePrice: 9.99,
-      status: "active",
-      variations: [
-        { id: "2-1", specifications: { plan: "Individual", duration: "1 Month" }, price: 9.99, stock: 100 },
-        { id: "2-2", specifications: { plan: "Family", duration: "1 Month" }, price: 15.99, stock: 100 }
-      ],
-      accountOptions: "both"
-    }
-  ]);
-
+  const [products, setProducts] = useState<Product[]>([]);
+  const [parentCategories, setParentCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [regionsLoading, setRegionsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "gift_card" as "gift_card" | "service",
-    category: "",
-    description: "",
-    basePrice: 0,
-    status: "active" as "active" | "inactive",
-    accountOptions: "both" as "new" | "existing" | "both",
-    bulkCodes: ""
+  const { toast } = useToast();
+
+  const form = useForm<ProductFormData>({
+    resolver: zodResolver(productFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      basePrice: 0,
+      isActive: true,
+      kind: "GIFTCARD",
+      code: "",
+      photoUrl: "",
+      productTypeId: "",
+      categoryId: "",
+      variations: []
+    }
   });
 
-  const categories = ["Entertainment", "Music", "Gaming", "Shopping", "Software"];
+  // Load products, categories, and regions on component mount
+  useEffect(() => {
+    loadProducts();
+    loadCategories();
+    loadRegions();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const productData: Product = {
-      id: editingProduct?.id || Date.now().toString(),
-      name: formData.name,
-      type: formData.type,
-      category: formData.category,
-      description: formData.description,
-      basePrice: formData.basePrice,
-      status: formData.status,
-      variations: [],
-      ...(formData.type === "gift_card" && {
-        codes: formData.bulkCodes.split('\n').filter(code => code.trim())
-      }),
-      ...(formData.type === "service" && {
-        accountOptions: formData.accountOptions
-      })
-    };
-
-    if (editingProduct) {
-      setProducts(prods => prods.map(prod => 
-        prod.id === editingProduct.id ? { ...productData, variations: editingProduct.variations } : prod
-      ));
+  // Load subcategories when product type changes
+  const productTypeId = form.watch("productTypeId");
+  useEffect(() => {
+    if (productTypeId) {
+      loadSubcategories(Number(productTypeId));
+      // Only reset category selection when product type changes if we're not editing
+      if (!editingProduct) {
+        form.setValue("categoryId", "");
+      }
     } else {
-      setProducts(prods => [...prods, productData]);
+      setSubcategories([]);
     }
+  }, [productTypeId, editingProduct, form]);
 
-    handleCloseDialog();
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await productsService.getProducts({ offset: 0, limit: 50 });
+      setProducts(response.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load products');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCloseDialog = () => {
+  const loadCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      // Load ALL categories first to find which ones have no parent (parent categories)
+      const response = await categoriesService.getCategories({ offset: 0, limit: 1000 });
+      const allCategories = response.data;
+      
+      // Filter categories that have NO parent (parentId is null) - these are our "Product Types"
+      const parentCategoriesOnly = allCategories.filter(category => category.parentId === null);
+      
+      setParentCategories(parentCategoriesOnly);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      toast({
+        title: "Warning",
+        description: "Failed to load categories. Please refresh the page.",
+        variant: "destructive",
+      });
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  const loadRegions = async () => {
+    try {
+      setRegionsLoading(true);
+      const response = await regionsService.getRegions({ offset: 0, limit: 1000, isActive: true });
+      setRegions(response.data);
+    } catch (err) {
+      console.error('Failed to load regions:', err);
+      toast({
+        title: "Warning",
+        description: "Failed to load regions. Please refresh the page.",
+        variant: "destructive",
+      });
+    } finally {
+      setRegionsLoading(false);
+    }
+  };
+
+  const loadSubcategories = async (parentId: number) => {
+    try {
+      // Load ALL categories and filter to find children of the selected parent
+      const response = await categoriesService.getCategories({ offset: 0, limit: 1000 });
+      const allCategories = response.data;
+      
+      // Filter categories that have the selected parentId (children of the selected parent)
+      const childrenCategories = allCategories.filter(category => category.parentId === parentId);
+      
+      setSubcategories(childrenCategories);
+    } catch (err) {
+      console.error('Failed to load subcategories:', err);
+      setSubcategories([]);
+    }
+  };
+
+  const onSubmit = async (data: ProductFormData) => {
+    setSubmitting(true);
+    
+    try {
+      // Transform form data using the schema
+      const transformedData: ProductData = productSchema.parse(data);
+      
+      const productData: CreateProductRequest = {
+        name: transformedData.name,
+        description: transformedData.description,
+        basePrice: transformedData.basePrice,
+        isActive: transformedData.isActive,
+        kind: transformedData.kind,
+        code: transformedData.code,
+        photoUrl: transformedData.photoUrl,
+        productTypeId: transformedData.productTypeId,
+        categoryId: transformedData.categoryId,
+        variations: transformedData.variations?.map(v => ({
+          name: v.name,
+          price: v.price,
+          duration: v.duration,
+          maxUsers: v.maxUsers,
+          availableCount: 0, // zero means unlimited - might get added to form fields and UI but not yet
+          regionIds: [v.regionId] // Convert single regionId to array as expected by API
+        })) || []
+      };
+
+      let response;
+      if (editingProduct) {
+        // Update product
+        const updateData: UpdateProductRequest = {
+          name: productData.name,
+          description: productData.description,
+          basePrice: productData.basePrice,
+          isActive: productData.isActive,
+          kind: productData.kind,
+          code: productData.code,
+          photoUrl: productData.photoUrl,
+          productTypeId: productData.productTypeId,
+          categoryId: productData.categoryId,
+          variations: productData.variations
+        };
+        response = await productsService.updateProduct(editingProduct.id, updateData);
+      } else {
+        // Create new product
+        response = await productsService.createProduct(productData);
+      }
+      
+      // Handle response based on success status
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: response.message?.en || (editingProduct ? "Product updated successfully" : "Product created successfully"),
+        });
+        // Reload products after successful operation
+        await loadProducts();
+        handleDialogClose();
+      } else {
+        toast({
+          title: "Error",
+          description: response.message?.en || "Operation failed",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to save product',
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDialogClose = () => {
     setIsDialogOpen(false);
     setEditingProduct(null);
     setActiveTab("basic");
-    setFormData({
+    setSubcategories([]); // Clear subcategories when closing dialog
+    form.reset({
       name: "",
-      type: "gift_card" as "gift_card" | "service",
-      category: "",
       description: "",
       basePrice: 0,
-      status: "active" as "active" | "inactive",
-      accountOptions: "both" as "new" | "existing" | "both",
-      bulkCodes: ""
+      isActive: true,
+      kind: "GIFTCARD",
+      code: "",
+      photoUrl: "",
+      productTypeId: "",
+      categoryId: "",
+      variations: []
     });
   };
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      type: product.type,
-      category: product.category,
-      description: product.description,
-      basePrice: product.basePrice,
-      status: product.status,
-      accountOptions: product.accountOptions || "both",
-      bulkCodes: product.codes?.join('\n') || ""
+  const handleCreate = () => {
+    setEditingProduct(null);
+    form.reset({
+      name: "",
+      description: "",
+      basePrice: 0,
+      isActive: true,
+      kind: "GIFTCARD",
+      code: "",
+      photoUrl: "",
+      productTypeId: "",
+      categoryId: "",
+      variations: []
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (productId: string) => {
-    if (confirm("Are you sure you want to delete this product? This action cannot be undone.")) {
-      setProducts(prods => prods.filter(prod => prod.id !== productId));
+  const handleEdit = async (product: Product) => {
+    setEditingProduct(product);
+    
+    // Load subcategories for the selected product type first
+    if (product.productTypeId) {
+      await loadSubcategories(product.productTypeId);
+    }
+    
+    // Reset form with product data
+    form.reset({
+      name: product.name,
+      description: product.description,
+      basePrice: parseFloat(product.basePrice),
+      isActive: product.isActive,
+      kind: (product as Product & { kind?: "GIFTCARD" | "SERVICE" }).kind || "GIFTCARD",
+      code: product.code || "",
+      photoUrl: product.photoUrl || "",
+      productTypeId: product.productTypeId.toString(),
+      categoryId: product.categoryId.toString(),
+      variations: product.variations.map(v => ({
+        name: v.name,
+        price: parseFloat(v.price),
+        duration: v.duration,
+        maxUsers: v.maxUsers,
+        regionId: v.regions && v.regions.length > 0 ? v.regions[0].regionId.toString() : ""
+      }))
+    });
+    
+    setIsDialogOpen(true);
+  };
+
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+    
+    setDeleting(true);
+    try {
+      const response = await productsService.deleteProduct(productToDelete.id);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Product deleted successfully",
+        });
+        await loadProducts();
+        setDeleteDialogOpen(false);
+        setProductToDelete(null);
+      } else {
+        toast({
+          title: "Error",
+          description: response.message?.en || "Failed to delete product",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to delete product',
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -159,9 +341,16 @@ export default function Products() {
           </p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          if (!open) {
+            handleDialogClose();
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button className="bg-gradient-primary hover:opacity-90">
+            <Button 
+              className="bg-gradient-primary hover:opacity-90"
+              onClick={handleCreate}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Product
             </Button>
@@ -174,155 +363,436 @@ export default function Products() {
             </DialogHeader>
             
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="specifications">Specifications</TabsTrigger>
-                <TabsTrigger value="codes">Codes & Options</TabsTrigger>
+                <TabsTrigger value="variations">Variations</TabsTrigger>
+                {/* <TabsTrigger value="codes">Codes & Options</TabsTrigger> */}
               </TabsList>
 
-              <form onSubmit={handleSubmit}>
-                <TabsContent value="basic" className="space-y-4">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)}>
+                  <TabsContent value="basic" className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="product-name">Product Name</Label>
-                      <Input
-                        id="product-name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="e.g., Netflix Gift Card"
-                        required
-                      />
-                    </div>
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Product Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., Netflix Gift Card"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     
-                    <div>
-                      <Label htmlFor="product-type">Product Type</Label>
-                      <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gift_card">Gift Card</SelectItem>
-                          <SelectItem value="service">Digital Service</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="category">Category</Label>
-                      <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map(cat => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="base-price">Base Price ($)</Label>
-                      <Input
-                        id="base-price"
-                        type="number"
-                        step="0.01"
-                        value={formData.basePrice}
-                        onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
-                        placeholder="0.00"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="Product description..."
-                      rows={3}
+                    <FormField
+                      control={form.control}
+                      name="kind"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Product Kind</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select product kind" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="GIFTCARD">Gift Card</SelectItem>
+                              <SelectItem value="SERVICE">Service</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      id="status"
-                      checked={formData.status === "active"}
-                      onCheckedChange={(checked) => setFormData({ ...formData, status: checked ? "active" : "inactive" })}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="code"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Product Code (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., NETFLIX2024"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    <Label htmlFor="status">Active Status</Label>
+                    
+                    <div></div> {/* Empty div to maintain grid layout */}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="productTypeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                            disabled={categoriesLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={categoriesLoading ? "Loading..." : "Select a category"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {parentCategories.map(category => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  {category.name} {category.children && category.children.length > 0 && `(${category.children.length} children)`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Subcategory</FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                            disabled={!productTypeId || subcategories.length === 0}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={
+                                  !productTypeId 
+                                    ? "Select a category first" 
+                                    : subcategories.length === 0 
+                                      ? "No subcategories available" 
+                                      : "Select a subcategory"
+                                } />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {subcategories.map(category => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="basePrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Base Price ($)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="photoUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Photo URL (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="https://example.com/image.jpg"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Product description..."
+                            rows={3}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Active Status</FormLabel>
+                          <div className="text-sm text-muted-foreground">
+                            Whether this product is available for purchase
+                          </div>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+
+                <TabsContent value="variations" className="space-y-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold">Product Variations</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Add different pricing tiers and options for your product (optional)
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const currentVariations = form.getValues("variations") || [];
+                          form.setValue("variations", [
+                            ...currentVariations,
+                            { name: "", price: 0, duration: 30, maxUsers: 1, regionId: "" }
+                          ]);
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Variation
+                      </Button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {form.watch("variations")?.map((variation, index) => (
+                        <Card key={index} className="p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-medium">Variation {index + 1}</h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const currentVariations = form.getValues("variations") || [];
+                                const newVariations = currentVariations.filter((_, i) => i !== index);
+                                form.setValue("variations", newVariations);
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.name`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Variation Name *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="e.g., 1 Month - 1 User"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.price`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Price ($) *</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.regionId`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Region *</FormLabel>
+                                  <Select 
+                                    onValueChange={field.onChange} 
+                                    value={field.value}
+                                    disabled={regionsLoading}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder={regionsLoading ? "Loading..." : "Select a region"} />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {regions.map(region => (
+                                        <SelectItem key={region.id} value={region.id.toString()}>
+                                          {region.name} ({region.code})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.duration`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Duration (days)</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      placeholder="30"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.maxUsers`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Max Users</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      placeholder="1"
+                                      {...field}
+                                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </Card>
+                      ))}
+                      
+                      {(!form.watch("variations") || form.watch("variations").length === 0) && (
+                        <div className="text-center py-8 border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                          <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                          <h3 className="text-lg font-semibold mb-2">No Variations Added</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Add pricing variations to offer different options for your product.
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              form.setValue("variations", [
+                                { name: "", price: 0, duration: 30, maxUsers: 1, regionId: "" }
+                              ]);
+                            }}
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Your First Variation
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="specifications" className="space-y-4">
+                {/* <TabsContent value="codes" className="space-y-4">
                   <div className="text-center py-8">
-                    <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-                    <p className="text-muted-foreground">Specifications management will be integrated here.</p>
+                    <Gift className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                    <p className="text-muted-foreground">Product codes and additional options will be managed here.</p>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Create specifications first, then assign them to products for dynamic pricing.
+                      Configure product-specific settings and codes.
                     </p>
                   </div>
-                </TabsContent>
+                </TabsContent> */}
 
-                <TabsContent value="codes" className="space-y-4">
-                  {formData.type === "gift_card" ? (
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <Label htmlFor="bulk-codes">Gift Card Codes</Label>
-                        <Button type="button" variant="outline" size="sm">
-                          <Upload className="w-4 h-4 mr-1" />
-                          Upload Excel
-                        </Button>
-                      </div>
-                      <Textarea
-                        id="bulk-codes"
-                        value={formData.bulkCodes}
-                        onChange={(e) => setFormData({ ...formData, bulkCodes: e.target.value })}
-                        placeholder="Enter codes (one per line)&#10;NFLX-ABC123&#10;NFLX-DEF456&#10;NFLX-GHI789"
-                        rows={8}
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Codes will be hidden after upload and only revealed after purchase.
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <Label htmlFor="account-options">Account Options</Label>
-                      <Select value={formData.accountOptions} onValueChange={(value: any) => setFormData({ ...formData, accountOptions: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New Account Only</SelectItem>
-                          <SelectItem value="existing">Existing Account Only</SelectItem>
-                          <SelectItem value="both">Both Options Available</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Choose whether customers can create new accounts or activate on existing ones.
-                      </p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <div className="flex justify-end gap-3 pt-4 border-t mt-6">
-                  <Button type="button" variant="outline" onClick={handleCloseDialog}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" className="bg-gradient-primary hover:opacity-90">
-                    {editingProduct ? "Update" : "Create"}
-                  </Button>
-                </div>
-              </form>
+                  <div className="flex justify-end gap-3 pt-4 border-t mt-6">
+                    <Button type="button" variant="outline" onClick={handleDialogClose} disabled={submitting}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-gradient-primary hover:opacity-90" disabled={submitting}>
+                      {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {editingProduct ? "Update" : "Create"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
             </Tabs>
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Products Table */}
       <Card>
@@ -330,75 +800,134 @@ export default function Products() {
           <CardTitle>Product Catalog</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Base Price</TableHead>
-                <TableHead>Variations</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product) => (
-                <TableRow key={product.id} className="hover:bg-muted/50">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {product.type === "gift_card" ? (
-                        <Gift className="w-5 h-5 text-primary" />
-                      ) : (
-                        <Package className="w-5 h-5 text-info" />
-                      )}
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-muted-foreground">{product.description}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={product.type === "gift_card" ? "default" : "secondary"}>
-                      {product.type === "gift_card" ? "Gift Card" : "Service"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell className="font-medium">${product.basePrice.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{product.variations.length} variations</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={product.status === "active" ? "default" : "secondary"}>
-                      {product.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(product.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          
-          {products.length === 0 && (
-            <div className="text-center py-8">
-              <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No products found. Create your first product to get started.</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span>Loading products...</span>
             </div>
+          ) : (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Base Price</TableHead>
+                    <TableHead>Variations</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {products.map((product) => (
+                    <TableRow key={product.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Package className="w-5 h-5 text-primary" />
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            {/* <div className="text-sm text-muted-foreground">{product.description}</div> */}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant="outline" className="text-xs">
+                            {product.productType.name}
+                          </Badge>
+                          {/* <div className="text-xs text-muted-foreground">
+                            Type ID: {product.productTypeId}
+                          </div> */}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant="secondary" className="text-xs">
+                            {product.category.name}
+                          </Badge>
+                          {/* <div className="text-xs text-muted-foreground">
+                            Category ID: {product.categoryId}
+                          </div> */}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">${parseFloat(product.basePrice).toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{product.variations.length} variations</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={product.isActive ? "default" : "secondary"}>
+                          {product.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(product)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(product)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {products.length === 0 && !loading && (
+                <div className="text-center py-8">
+                  <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No products found. Create your first product to get started.</p>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-destructive" />
+              Delete Product
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete the product <strong>"{productToDelete?.name}"</strong>? 
+              This action cannot be undone and will also delete all variations.
+            </p>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setProductToDelete(null);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button"
+                variant="destructive"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Delete Product
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

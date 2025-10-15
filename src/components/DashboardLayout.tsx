@@ -47,9 +47,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </Button>
                   
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground hidden sm:block">
-                      {user?.name || 'Admin'}
-                    </span>
                     <Button variant="ghost" size="icon">
                       <User className="w-5 h-5" />
                     </Button>
