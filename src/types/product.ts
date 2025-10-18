@@ -7,6 +7,8 @@ export interface ProductVariation {
   productId: number;
   createdAt: string;
   updatedAt: string;
+  regionIds: number[];
+  availableCount: number;
 }
 
 export interface Category {
@@ -65,6 +67,7 @@ export interface CreateProductRequest {
   description: string;
   basePrice: number;
   isActive: boolean;
+  kind: "GIFTCARD" | "SERVICE";
   code?: string;
   photoUrl?: string;
   productTypeId: number;
@@ -86,6 +89,7 @@ export interface UpdateProductRequest {
   description?: string;
   basePrice?: number;
   isActive?: boolean;
+  kind: "GIFTCARD" | "SERVICE";
   code?: string;
   photoUrl?: string;
   productTypeId?: number;

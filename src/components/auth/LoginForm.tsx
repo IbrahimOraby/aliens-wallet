@@ -92,7 +92,7 @@ export function LoginForm({ onSwitchToSignup, onSwitchToOTP }: LoginFormProps) {
           description: errorMessage,
           variant: "destructive",
         });
-        setRequiresTOTP(false);
+        form.setValue('totp', '');
       }
     } finally {
       setLoading(false);
