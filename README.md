@@ -1,73 +1,166 @@
-# Welcome to your Lovable project
+# Digi Gift Spark - Digital Services & Gift Cards E-Commerce Platform
 
-## Project info
+A modern, full-stack e-commerce platform for selling digital services and gift cards with instant delivery. Features a customer-facing storefront and a comprehensive admin dashboard for managing products, categories, and orders.
 
-**URL**: https://lovable.dev/projects/89b294e2-44bf-42eb-a824-a478cc0c811b
+## 🚀 Features
 
-## How can I edit this code?
+### Customer Store
+- **Product Catalog** - Browse digital services and gift cards with advanced filtering
+- **Cascading Variation Selection** - Smart dropdown system (Region → Duration → Type) for selecting product variations
+- **Shopping Cart** - Add to cart with quantity management
+- **Checkout Flow** - Complete purchase process with order confirmation
+- **Product Details** - Detailed product pages with variations, pricing, and descriptions
+- **Responsive Design** - Mobile-first design that works on all devices
 
-There are several ways of editing your application.
+### Admin Dashboard
+- **Product Management** - Create, edit, and delete products with multiple variations
+- **Category Management** - Hierarchical category system (parent/child categories)
+- **Variation Management** - Configure pricing, duration, regions, and availability
+- **Order Management** - Track and manage customer orders
+- **User Authentication** - Role-based access control (Admin/Customer)
+- **Real-time Updates** - Dynamic product counts and availability tracking
 
-**Use Lovable**
+## 🛠️ Tech Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/89b294e2-44bf-42eb-a824-a478cc0c811b) and start prompting.
+- **Frontend Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **UI Components**: shadcn/ui
+- **Styling**: Tailwind CSS
+- **Routing**: React Router v6
+- **Form Handling**: React Hook Form + Zod validation
+- **State Management**: React Context API
+- **HTTP Client**: Fetch API
+- **Icons**: Lucide React
 
-Changes made via Lovable will be committed automatically to this repo.
+## 📋 Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ and npm
+- API endpoint configuration (update API base URL in services)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🏃 Getting Started
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Installation
 
-Follow these steps:
+1. **Clone the repository**
+   ```sh
+   git clone <YOUR_GIT_URL>
+   cd digi-gift-spark-main
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+2. **Install dependencies**
+   ```sh
+   npm install
+   ```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. **Configure API endpoint** (if needed)
+   Update the API base URL in `src/services/*.ts` files:
+   ```typescript
+   const API_BASE_URL = 'http://your-api-url.com/api';
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+4. **Start development server**
+   ```sh
+   npm run dev
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+5. **Open in browser**
+   Navigate to `http://localhost:5173` (or the port shown in terminal)
+
+## 📁 Project Structure
+
+```
+src/
+├── components/          # Reusable UI components
+│   ├── auth/           # Authentication components
+│   ├── ui/             # shadcn/ui components
+│   └── ...
+├── contexts/           # React context providers
+├── hooks/              # Custom React hooks
+├── lib/                # Utility functions
+├── pages/              # Page components
+│   ├── store/          # Customer-facing pages
+│   └── ...             # Admin dashboard pages
+├── schemas/            # Zod validation schemas
+├── services/           # API service layer
+├── types/              # TypeScript type definitions
+└── ...
 ```
 
-**Edit a file directly in GitHub**
+## 🎯 Key Features Implementation
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Cascading Variation Selection
+The product detail page implements a smart three-dropdown system:
+1. **Region** - Select available region
+2. **Duration** - Filtered based on selected region
+3. **Type** - Filtered based on region + duration
 
-**Use GitHub Codespaces**
+This ensures users only see valid product combinations.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Product Variations
+- Multiple variations per product
+- Region-based availability
+- Duration and max users configuration
+- Stock management (unlimited or limited count)
 
-## What technologies are used for this project?
+### Shopping Cart
+- Persistent cart (localStorage)
+- Quantity management
+- Variation-based cart items
+- Total price calculation
 
-This project is built with:
+## 🔐 Authentication
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The platform supports role-based authentication:
+- **Admin** - Full access to dashboard and management features
+- **Customer** - Access to store and purchase features
 
-## How can I deploy this project?
+## 📦 Available Scripts
 
-Simply open [Lovable](https://lovable.dev/projects/89b294e2-44bf-42eb-a824-a478cc0c811b) and click on Share -> Publish.
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run build:dev` - Build in development mode
+- `npm run lint` - Run ESLint
+- `npm run preview` - Preview production build
 
-## Can I connect a custom domain to my Lovable project?
+## 🌐 API Integration
 
-Yes, you can!
+The application integrates with a RESTful API for:
+- Product management
+- Category management
+- User authentication
+- Order processing
+- Region management
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🎨 UI/UX Highlights
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- **Hero Carousel** - Dynamic, full-screen product showcases
+- **Product Cards** - Consistent, responsive card design across all views
+- **Loading States** - Skeleton screens and spinners for better UX
+- **Error Handling** - User-friendly error messages
+- **Toast Notifications** - Non-intrusive feedback for user actions
+
+## 📝 Development Notes
+
+- All forms use React Hook Form with Zod validation
+- API calls are handled through service layer with error handling
+- Product variations support unlimited or limited stock counts
+- Categories support hierarchical structure (parent/child)
+- Responsive design follows mobile-first approach
+
+## 🔧 Configuration
+
+Update environment variables and API endpoints as needed:
+- API Base URL in service files
+- Authentication token management in `src/services/auth.ts`
+
+## 📄 License
+
+[Add your license information here]
+
+## 👥 Contributors
+
+[Add contributor information here]
+
+---
+
+Built with ❤️ using React, TypeScript, and modern web technologies.
