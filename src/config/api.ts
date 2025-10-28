@@ -8,10 +8,10 @@ if (!API_BASE_URL) {
 }
 
 // In production (hosted), ensure HTTPS is used
-let finalApiUrl = API_BASE_URL;
+const finalApiUrl = API_BASE_URL;
 if (import.meta.env.PROD && finalApiUrl.startsWith('http://')) {
   // Try converting to HTTPS
-  finalApiUrl = finalApiUrl.replace('http://', 'https://');
+//   finalApiUrl = finalApiUrl.replace('http://', 'https://');
   console.warn('⚠️ API URL converted to HTTPS for production:', finalApiUrl);
 }
 
