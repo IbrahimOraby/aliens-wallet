@@ -150,19 +150,24 @@ The application integrates with a RESTful API for:
 
 ## 🔧 Configuration
 
-### Environment Variables
+### API Configuration
 
-For **local development**, create a `.env` file:
+**For local development** (optional):
+Create a `.env` file if you want to override the default:
 ```env
 VITE_API_BASE_URL=http://46.101.174.239:8082/api
 ```
 
-For **production deployment** (Netlify/Vercel):
-1. **In Netlify**: Go to Site Settings → Build & deploy → Environment → Edit variables
-2. Add: `VITE_API_BASE_URL` = `https://your-api-url.com/api` (or HTTP if HTTPS not supported)
-3. **Important**: The API URL is no longer hardcoded to prevent secrets scanning failures
+**For production (Netlify)**:
+- No environment variables needed.
+- The app automatically uses `/api` which is proxied through Netlify.
+- Netlify proxy converts HTTP backend calls to HTTPS (no mixed content errors).
+- See `netlify.toml` for proxy configuration.
 
-**Note**: The app will automatically try to convert HTTP to HTTPS in production. The API URL is required as an environment variable - the build will fail if it's not set.
+**How it works:**
+- Your HTTPS site calls `/api/products`
+- Netlify proxies to `http://46.101.174.239:8082/api/products` (server-side)
+- Browser receives response over HTTPS (no mixed content errors)
 
 ### Other Configuration
 - Authentication token management in `src/services/auth.ts`
