@@ -4,8 +4,7 @@ import {
   OTPFormData,
   AuthUser
 } from "@/types/auth";
-
-const API_BASE_URL = "http://46.101.174.239:8082/api";
+import { API_BASE_URL } from "@/config/api";
 
 // Token management utilities
 export const tokenManager = {

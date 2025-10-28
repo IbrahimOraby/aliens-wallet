@@ -53,9 +53,13 @@ A modern, full-stack e-commerce platform for selling digital services and gift c
    ```
 
 3. **Configure API endpoint** (if needed)
-   Update the API base URL in `src/services/*.ts` files:
-   ```typescript
-   const API_BASE_URL = 'http://your-api-url.com/api';
+   Create a `.env` file in the root directory:
+   ```env
+   VITE_API_BASE_URL=http://your-api-url.com/api
+   ```
+   Or for production (HTTPS):
+   ```env
+   VITE_API_BASE_URL=https://your-api-url.com/api
    ```
 
 4. **Start development server**
@@ -149,8 +153,20 @@ The application integrates with a RESTful API for:
 
 ## 🔧 Configuration
 
-Update environment variables and API endpoints as needed:
-- API Base URL in service files
+### Environment Variables
+
+For **local development**, create a `.env` file:
+```env
+VITE_API_BASE_URL=http://46.101.174.239:8082/api
+```
+
+For **production deployment** (Netlify/Vercel):
+1. Go to Site Settings → Environment Variables
+2. Add: `VITE_API_BASE_URL` = `https://your-api-url.com/api` (or keep HTTP if your backend doesn't support HTTPS yet)
+
+**Note**: The app will automatically try to convert HTTP to HTTPS in production, but you should configure your backend to support HTTPS for security.
+
+### Other Configuration
 - Authentication token management in `src/services/auth.ts`
 
 ## 📄 License

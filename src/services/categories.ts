@@ -1,7 +1,6 @@
 import { Category, CategoryResponse, CreateCategoryRequest, UpdateCategoryRequest, CategoryFilters } from '@/types/category';
 import { tokenManager } from '@/services/auth';
-
-const API_BASE_URL = 'http://46.101.174.239:8082/api';
+import { API_BASE_URL } from '@/config/api';
 
 class CategoriesService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
