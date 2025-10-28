@@ -1,13 +1,19 @@
 // API Configuration
-// Use environment variable or fallback to the default API URL
-let API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://46.101.174.239:8082/api';
+// Use environment variable - must be set in Netlify environment variables
+// For local development, create a .env file with VITE_API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// In production (hosted), try to use HTTPS if HTTP is provided
-if (import.meta.env.PROD && API_BASE_URL.startsWith('http://')) {
-  // Try converting to HTTPS
-  API_BASE_URL = API_BASE_URL.replace('http://', 'https://');
-  console.warn('⚠️ API URL converted to HTTPS for production:', API_BASE_URL);
+if (!API_BASE_URL) {
+  throw new Error('VITE_API_BASE_URL environment variable is not set. Please configure it in your deployment settings.');
 }
 
-export { API_BASE_URL };
+// In production (hosted), ensure HTTPS is used
+let finalApiUrl = API_BASE_URL;
+if (import.meta.env.PROD && finalApiUrl.startsWith('http://')) {
+  // Try converting to HTTPS
+  finalApiUrl = finalApiUrl.replace('http://', 'https://');
+  console.warn('⚠️ API URL converted to HTTPS for production:', finalApiUrl);
+}
+
+export { finalApiUrl as API_BASE_URL };
 

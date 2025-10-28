@@ -52,15 +52,12 @@ A modern, full-stack e-commerce platform for selling digital services and gift c
    npm install
    ```
 
-3. **Configure API endpoint** (if needed)
+3. **Configure API endpoint** (Required)
    Create a `.env` file in the root directory:
    ```env
    VITE_API_BASE_URL=http://your-api-url.com/api
    ```
-   Or for production (HTTPS):
-   ```env
-   VITE_API_BASE_URL=https://your-api-url.com/api
-   ```
+   **Note**: This file is git-ignored and won't be committed to the repository.
 
 4. **Start development server**
    ```sh
@@ -161,10 +158,11 @@ VITE_API_BASE_URL=http://46.101.174.239:8082/api
 ```
 
 For **production deployment** (Netlify/Vercel):
-1. Go to Site Settings → Environment Variables
-2. Add: `VITE_API_BASE_URL` = `https://your-api-url.com/api` (or keep HTTP if your backend doesn't support HTTPS yet)
+1. **In Netlify**: Go to Site Settings → Build & deploy → Environment → Edit variables
+2. Add: `VITE_API_BASE_URL` = `https://your-api-url.com/api` (or HTTP if HTTPS not supported)
+3. **Important**: The API URL is no longer hardcoded to prevent secrets scanning failures
 
-**Note**: The app will automatically try to convert HTTP to HTTPS in production, but you should configure your backend to support HTTPS for security.
+**Note**: The app will automatically try to convert HTTP to HTTPS in production. The API URL is required as an environment variable - the build will fail if it's not set.
 
 ### Other Configuration
 - Authentication token management in `src/services/auth.ts`
