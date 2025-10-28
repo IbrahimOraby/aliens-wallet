@@ -9,6 +9,22 @@ export interface ProductVariation {
   updatedAt: string;
   regionIds: number[];
   availableCount: number;
+  regions?: Array<{
+    id: number;
+    variationId: number;
+    regionId: number;
+    createdAt: string;
+    region: {
+      id: number;
+      name: string;
+      code: string;
+      isActive: boolean;
+      createdAt: string;
+      updatedAt: string;
+      createdUserId: number;
+      updatedUserId: number | null;
+    };
+  }>;
 }
 
 export interface Category {
@@ -40,6 +56,7 @@ export interface Product {
   description: string;
   basePrice: string;
   isActive: boolean;
+  kind: "GIFTCARD" | "SERVICE";
   code?: string;
   productTypeId: number;
   categoryId: number;

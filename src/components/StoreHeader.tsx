@@ -32,9 +32,9 @@ export const StoreHeader = () => {
               <Link to="/store/shop" className="text-foreground hover:text-primary transition-colors">
                 Shop
               </Link>
-              <Link to="/store/categories" className="text-foreground hover:text-primary transition-colors">
+              {/* <Link to="/store/categories" className="text-foreground hover:text-primary transition-colors">
                 Categories
-              </Link>
+              </Link> */}
             </nav>
           </div>
 

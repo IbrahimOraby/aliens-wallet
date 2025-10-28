@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ProductVariation } from '@/types/product';
 
 export interface CartItem {
   id: string;
@@ -11,6 +12,7 @@ export interface CartItem {
     duration?: string;
     accountType?: string;
   };
+  variation?: ProductVariation;
 }
 
 export const useCart = () => {
@@ -33,12 +35,15 @@ export const useCart = () => {
     setItems(current => {
       const existingItem = current.find(i => 
         i.id === item.id && 
+        i.variation?.id === item.variation?.id &&
         JSON.stringify(i.specifications) === JSON.stringify(item.specifications)
       );
       
       if (existingItem) {
         return current.map(i => 
-          i.id === item.id && JSON.stringify(i.specifications) === JSON.stringify(item.specifications)
+          i.id === item.id && 
+          i.variation?.id === item.variation?.id &&
+          JSON.stringify(i.specifications) === JSON.stringify(item.specifications)
             ? { ...i, quantity: i.quantity + item.quantity }
             : i
         );
@@ -48,23 +53,27 @@ export const useCart = () => {
     });
   };
 
-  const removeItem = (id: string, specifications?: CartItem['specifications']) => {
+  const removeItem = (id: string, specifications?: CartItem['specifications'], variationId?: number) => {
     setItems(current => 
       current.filter(item => 
-        !(item.id === id && JSON.stringify(item.specifications) === JSON.stringify(specifications))
+        !(item.id === id && 
+          item.variation?.id === variationId &&
+          JSON.stringify(item.specifications) === JSON.stringify(specifications))
       )
     );
   };
 
-  const updateQuantity = (id: string, quantity: number, specifications?: CartItem['specifications']) => {
+  const updateQuantity = (id: string, quantity: number, specifications?: CartItem['specifications'], variationId?: number) => {
     if (quantity <= 0) {
-      removeItem(id, specifications);
+      removeItem(id, specifications, variationId);
       return;
     }
     
     setItems(current =>
       current.map(item =>
-        item.id === id && JSON.stringify(item.specifications) === JSON.stringify(specifications)
+        item.id === id && 
+        item.variation?.id === variationId &&
+        JSON.stringify(item.specifications) === JSON.stringify(specifications)
           ? { ...item, quantity }
           : item
       )

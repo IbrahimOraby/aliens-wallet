@@ -172,7 +172,7 @@ export default function Products() {
           price: v.price,
           duration: v.duration,
           maxUsers: v.maxUsers,
-          availableCount: 0, // zero means unlimited - might get added to form fields and UI but not yet
+          availableCount: v.isUnlimited ? 0 : v.availableCount, // zero means unlimited
           regionIds: [v.regionId] // Convert single regionId to array as expected by API
         })) || []
       };
@@ -285,6 +285,8 @@ export default function Products() {
         price: parseFloat(v.price),
         duration: v.duration,
         maxUsers: v.maxUsers,
+        availableCount: v.availableCount || 0,
+        isUnlimited: (v.availableCount || 0) === 0,
         regionId: v.regions && v.regions.length > 0 ? v.regions[0].regionId.toString() : ""
       }))
     });
@@ -599,7 +601,7 @@ export default function Products() {
                           const currentVariations = form.getValues("variations") || [];
                           form.setValue("variations", [
                             ...currentVariations,
-                            { name: "", price: 0, duration: 30, maxUsers: 1, regionId: "" }
+                            { name: "", price: 0, duration: 30, maxUsers: 1, availableCount: 0, isUnlimited: true, regionId: "" }
                           ]);
                         }}
                       >
@@ -732,6 +734,54 @@ export default function Products() {
                               )}
                             />
                           </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.isUnlimited`}
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                  <div className="space-y-0.5">
+                                    <FormLabel className="text-base">Unlimited Stock</FormLabel>
+                                    <div className="text-sm text-muted-foreground">
+                                      Enable for unlimited availability
+                                    </div>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={(checked) => {
+                                        field.onChange(checked);
+                                        if (checked) {
+                                          form.setValue(`variations.${index}.availableCount`, 0);
+                                        }
+                                      }}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name={`variations.${index}.availableCount`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Available Count</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="number"
+                                      placeholder="0"
+                                      {...field}
+                                      disabled={form.watch(`variations.${index}.isUnlimited`)}
+                                      onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
                         </Card>
                       ))}
                       
@@ -747,7 +797,7 @@ export default function Products() {
                             variant="outline"
                             onClick={() => {
                               form.setValue("variations", [
-                                { name: "", price: 0, duration: 30, maxUsers: 1, regionId: "" }
+                                { name: "", price: 0, duration: 30, maxUsers: 1, availableCount: 0, isUnlimited: true, regionId: "" }
                               ]);
                             }}
                           >

@@ -1,99 +1,145 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Star, Shield, Clock, ArrowLeft, Plus, Minus } from "lucide-react";
+import { Star, Shield, Clock, ArrowLeft, Plus, Minus, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
 import { useCart } from "@/hooks/useCart";
 import { toast } from "@/hooks/use-toast";
+import { productsService } from "@/services/products";
+import { Product } from "@/types/product";
 
-const mockProduct = {
-  id: "1",
-  title: "ChatGPT Plus Premium Account",
-  category: "AI Services",
-  type: "Premium Accounts",
-  basePrice: 20,
-  originalPrice: 25,
-  image: "/placeholder.svg",
-  rating: 4.8,
-  reviewCount: 156,
-  description: "Get access to ChatGPT Plus with faster response times, priority access, and access to the latest features including GPT-4.",
-  features: [
-    "Access to GPT-4 model",
-    "Faster response times",
-    "Priority access during high traffic",
-    "Access to newest features first",
-    "24/7 customer support"
-  ],
-  specifications: {
-    plan: {
-      options: ["Basic", "Pro", "Enterprise"],
-      prices: { "Basic": 20, "Pro": 35, "Enterprise": 60 }
-    },
-    duration: {
-      options: ["1 Month", "3 Months", "12 Months"],
-      multipliers: { "1 Month": 1, "3 Months": 2.8, "12 Months": 10 }
-    },
-    accountType: {
-      options: ["New Account", "Upgrade Existing"],
-      prices: { "New Account": 0, "Upgrade Existing": 5 }
-    }
-  },
-  deliveryInfo: "Instant delivery via email within 5 minutes of payment confirmation.",
-  reviews: [
-    {
-      id: 1,
-      user: "John D.",
-      rating: 5,
-      comment: "Excellent service! Account was delivered instantly and works perfectly.",
-      date: "2 days ago"
-    },
-    {
-      id: 2,
-      user: "Sarah M.",
-      rating: 4,
-      comment: "Great product, fast delivery. Minor delay but customer service was helpful.",
-      date: "1 week ago"
-    }
-  ]
-};
 
 export default function ProductDetails() {
   const { id } = useParams();
   const { addItem } = useCart();
-  const [selectedSpecs, setSelectedSpecs] = useState({
-    plan: "Basic",
-    duration: "1 Month", 
-    accountType: "New Account"
-  });
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<string>("");
+  const [selectedDuration, setSelectedDuration] = useState<string>("");
+  const [selectedVariationName, setSelectedVariationName] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
 
+  // Load product data on component mount
+  useEffect(() => {
+    const loadProduct = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await productsService.getProductById(Number(id));
+        
+        if (response.success) {
+          setProduct(response.data);
+        } else {
+          setError("Failed to load product");
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load product');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProduct();
+  }, [id]);
+
+  // Get unique regions from all variations
+  const getAvailableRegions = () => {
+    if (!product) return [];
+    const regionsSet = new Set<string>();
+    product.variations.forEach(variation => {
+      if (variation.regions && variation.regions.length > 0) {
+        variation.regions.forEach(r => {
+          regionsSet.add(JSON.stringify({ id: r.regionId, name: r.region.name }));
+        });
+      }
+    });
+    return Array.from(regionsSet).map(r => JSON.parse(r));
+  };
+
+  // Get available durations based on selected region
+  const getAvailableDurations = () => {
+    if (!product || !selectedRegion) return [];
+    const durationsSet = new Set<number>();
+    product.variations.forEach(variation => {
+      const hasRegion = variation.regions?.some(r => r.regionId.toString() === selectedRegion);
+      if (hasRegion && variation.duration) {
+        durationsSet.add(variation.duration);
+      }
+    });
+    return Array.from(durationsSet).sort((a, b) => a - b);
+  };
+
+  // Get available variation names based on selected region and duration
+  const getAvailableVariationNames = () => {
+    if (!product || !selectedRegion || !selectedDuration) return [];
+    const variations = product.variations.filter(variation => {
+      const hasRegion = variation.regions?.some(r => r.regionId.toString() === selectedRegion);
+      const hasDuration = variation.duration?.toString() === selectedDuration;
+      return hasRegion && hasDuration;
+    });
+    return variations.map(v => ({ id: v.id.toString(), name: v.name }));
+  };
+
+  // Find matching variation based on all selections
+  const selectedVariation = product?.variations.find(v => {
+    const hasRegion = v.regions?.some(r => r.regionId.toString() === selectedRegion);
+    const hasDuration = v.duration?.toString() === selectedDuration;
+    const hasName = v.id.toString() === selectedVariationName;
+    return hasRegion && hasDuration && hasName;
+  });
+  
   const calculatePrice = () => {
-    const planPrice = mockProduct.specifications.plan.prices[selectedSpecs.plan as keyof typeof mockProduct.specifications.plan.prices];
-    const durationMultiplier = mockProduct.specifications.duration.multipliers[selectedSpecs.duration as keyof typeof mockProduct.specifications.duration.multipliers];
-    const accountTypePrice = mockProduct.specifications.accountType.prices[selectedSpecs.accountType as keyof typeof mockProduct.specifications.accountType.prices];
-    
-    return Math.round((planPrice + accountTypePrice) * durationMultiplier);
+    if (!selectedVariation) return 0;
+    return parseFloat(selectedVariation.price);
   };
 
   const handleAddToCart = () => {
+    if (!product || !selectedVariation) return;
+    
     addItem({
-      id: mockProduct.id,
-      title: mockProduct.title,
+      id: product.id.toString(),
+      title: product.name,
       price: calculatePrice(),
       quantity,
-      image: mockProduct.image,
-      specifications: selectedSpecs,
+      image: product.photoUrl || "/placeholder.svg",
+      variation: selectedVariation,
     });
     
     toast({
       title: "Added to cart",
-      description: `${mockProduct.title} has been added to your cart.`,
+      description: `${product.name} has been added to your cart.`,
     });
   };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin mr-2" />
+          <span>Loading product...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error || "Product not found"}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -111,7 +157,11 @@ export default function ProductDetails() {
           <Card>
             <CardContent className="p-8">
               <div className="aspect-square bg-gradient-card rounded-lg flex items-center justify-center">
-                <img src={mockProduct.image} alt={mockProduct.title} className="w-32 h-32 object-contain" />
+                <img 
+                  src={product.photoUrl || "/placeholder.svg"} 
+                  alt={product.name} 
+                  className="w-32 h-32 object-contain" 
+                />
               </div>
             </CardContent>
           </Card>
@@ -120,68 +170,99 @@ export default function ProductDetails() {
         {/* Product Info */}
         <div className="space-y-6">
           <div>
-            <Badge variant="secondary" className="mb-2">{mockProduct.category}</Badge>
-            <h1 className="text-3xl font-bold mb-4">{mockProduct.title}</h1>
+            <Badge variant="secondary" className="mb-2">{product.category.name}</Badge>
+            <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
             
             <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-1">
-                <Star className="h-5 w-5 fill-warning text-warning" />
-                <span className="font-semibold">{mockProduct.rating}</span>
-                <span className="text-muted-foreground">({mockProduct.reviewCount} reviews)</span>
-              </div>
+              <Badge variant="outline">{product.productType.name}</Badge>
+              <Badge variant={product.isActive ? "default" : "secondary"}>
+                {product.isActive ? "Available" : "Unavailable"}
+              </Badge>
             </div>
 
-            <p className="text-muted-foreground mb-6">{mockProduct.description}</p>
+            <p className="text-muted-foreground mb-6">{product.description}</p>
           </div>
 
-          {/* Specifications */}
+          {/* Variation Selection */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Customize Your Order</h3>
+            <h3 className="text-lg font-semibold">Select Your Options</h3>
             
-            {/* Plan Selection */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Plan</label>
-              <Select value={selectedSpecs.plan} onValueChange={(value) => setSelectedSpecs({...selectedSpecs, plan: value})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockProduct.specifications.plan.options.map((option) => (
-                    <SelectItem key={option} value={option}>{option}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {product.variations.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Region Selection */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Region</label>
+                  <Select 
+                    value={selectedRegion} 
+                    onValueChange={(value) => {
+                      setSelectedRegion(value);
+                      setSelectedDuration("");
+                      setSelectedVariationName("");
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableRegions().map((region) => (
+                        <SelectItem key={region.id} value={region.id.toString()}>
+                          {region.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Duration Selection */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Duration</label>
-              <Select value={selectedSpecs.duration} onValueChange={(value) => setSelectedSpecs({...selectedSpecs, duration: value})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockProduct.specifications.duration.options.map((option) => (
-                    <SelectItem key={option} value={option}>{option}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {/* Duration Selection */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Duration</label>
+                  <Select 
+                    value={selectedDuration} 
+                    onValueChange={(value) => {
+                      setSelectedDuration(value);
+                      setSelectedVariationName("");
+                    }}
+                    disabled={!selectedRegion}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedRegion ? "Select duration" : "Select region first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableDurations().map((duration) => (
+                        <SelectItem key={duration} value={duration.toString()}>
+                          {duration} days
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            {/* Account Type Selection */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Account Type</label>
-              <Select value={selectedSpecs.accountType} onValueChange={(value) => setSelectedSpecs({...selectedSpecs, accountType: value})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {mockProduct.specifications.accountType.options.map((option) => (
-                    <SelectItem key={option} value={option}>{option}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                {/* Variation Name Selection */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Type</label>
+                  <Select 
+                    value={selectedVariationName} 
+                    onValueChange={setSelectedVariationName}
+                    disabled={!selectedRegion || !selectedDuration}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedDuration ? "Select type" : "Select duration first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableVariationNames().map((variation) => (
+                        <SelectItem key={variation.id} value={variation.id}>
+                          {variation.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                No variations available for this product.
+              </div>
+            )}
           </div>
 
           {/* Quantity */}
@@ -208,23 +289,36 @@ export default function ProductDetails() {
 
           {/* Price and Add to Cart */}
           <div className="border-t pt-6">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <span className="text-2xl font-bold text-primary">${calculatePrice()}</span>
-                {mockProduct.originalPrice && (
-                  <span className="text-lg text-muted-foreground line-through ml-2">
-                    ${mockProduct.originalPrice}
+            {selectedVariation ? (
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <span className="text-2xl font-bold text-primary">
+                    ${calculatePrice().toFixed(2)}
                   </span>
-                )}
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {selectedVariation.duration && `${selectedVariation.duration} days`}
+                    {selectedVariation.maxUsers && ` • Max ${selectedVariation.maxUsers} user${selectedVariation.maxUsers > 1 ? 's' : ''}`}
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center justify-center mb-4 p-4 bg-muted/30 rounded-lg">
+                <p className="text-sm text-muted-foreground">Select your options to see the price</p>
+              </div>
+            )}
             
             <Button 
               className="w-full bg-gradient-primary hover:opacity-90 mb-4" 
               size="lg"
               onClick={handleAddToCart}
+              disabled={!selectedVariation || !product.isActive || !selectedRegion || !selectedDuration || !selectedVariationName}
             >
-              Add to Cart - ${calculatePrice() * quantity}
+              {!product.isActive 
+                ? 'Product Unavailable' 
+                : !selectedVariation 
+                  ? 'Select Options First' 
+                  : `Add to Cart - $${(calculatePrice() * quantity).toFixed(2)}`
+              }
             </Button>
 
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -243,58 +337,93 @@ export default function ProductDetails() {
 
       {/* Product Tabs */}
       <Tabs defaultValue="description" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews ({mockProduct.reviews.length})</TabsTrigger>
-          <TabsTrigger value="delivery">Delivery Info</TabsTrigger>
+          <TabsTrigger value="variations">Available Variations</TabsTrigger>
         </TabsList>
         
         <TabsContent value="description" className="mt-6">
           <Card>
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Features</h3>
-              <ul className="space-y-2">
-                {mockProduct.features.map((feature, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-primary rounded-full" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              <h3 className="text-lg font-semibold mb-4">Product Details</h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Description</h4>
+                  <p className="text-muted-foreground">{product.description}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Category</h4>
+                  <p className="text-muted-foreground">{product.category.name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Type</h4>
+                  <p className="text-muted-foreground">{product.kind}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium mb-2">Base Price</h4>
+                  <p className="text-muted-foreground">${parseFloat(product.basePrice).toFixed(2)}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
         
-        <TabsContent value="reviews" className="mt-6">
+        <TabsContent value="variations" className="mt-6">
           <div className="space-y-4">
-            {mockProduct.reviews.map((review) => (
-              <Card key={review.id}>
+            {product.variations.map((variation) => (
+              <Card key={variation.id}>
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{review.user}</span>
-                      <div className="flex">
-                        {[...Array(review.rating)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 fill-warning text-warning" />
-                        ))}
-                      </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-lg">{variation.name}</h4>
+                      <p className="text-2xl font-bold text-primary">${parseFloat(variation.price).toFixed(2)}</p>
                     </div>
-                    <span className="text-sm text-muted-foreground">{review.date}</span>
+                    <Badge variant="outline">
+                      {variation.regions && variation.regions.length > 0 
+                        ? variation.regions[0].region.name 
+                        : 'No region specified'
+                      }
+                    </Badge>
                   </div>
-                  <p className="text-muted-foreground">{review.comment}</p>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    {variation.duration && (
+                      <div>
+                        <span className="font-medium">Duration:</span>
+                        <p className="text-muted-foreground">{variation.duration} days</p>
+                      </div>
+                    )}
+                    {variation.maxUsers && (
+                      <div>
+                        <span className="font-medium">Max Users:</span>
+                        <p className="text-muted-foreground">{variation.maxUsers}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-medium">Available Count:</span>
+                      <p className="text-muted-foreground">
+                        {variation.availableCount === 0 ? 'Unlimited' : variation.availableCount}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Status:</span>
+                      <p className="text-muted-foreground">
+                        {variation.availableCount === 0 || variation.availableCount > 0 ? 'Available' : 'Out of Stock'}
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             ))}
+            
+            {product.variations.length === 0 && (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground">No variations available for this product.</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        </TabsContent>
-        
-        <TabsContent value="delivery" className="mt-6">
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Delivery Information</h3>
-              <p className="text-muted-foreground">{mockProduct.deliveryInfo}</p>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>

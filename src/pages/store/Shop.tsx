@@ -255,7 +255,7 @@ export default function Shop() {
                           <Link to={`/store/product/${product.id}`}>{product.name}</Link>
                         </h3>
                         
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-1">
                           {product.description}
                         </p>
 

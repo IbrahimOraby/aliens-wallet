@@ -20,6 +20,12 @@ export const productVariationFormSchema = z.object({
     .min(1, "Max users must be at least 1")
     .max(100, "Max users must be less than 100")
     .optional(),
+  availableCount: z
+    .number({ required_error: "Available count is required" })
+    .min(0, "Available count must be 0 or greater")
+    .max(999999, "Available count must be less than 1,000,000")
+    .default(0),
+  isUnlimited: z.boolean().default(true),
   regionId: z
     .string({ required_error: "Region is required" })
     .refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
