@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Link } from "react-router-dom";
-import { useCart } from "@/hooks/useCart";
 import { categoriesService } from "@/services/categories";
 import { productsService } from "@/services/products";
 import { Category } from "@/types/category";
@@ -29,7 +28,6 @@ export default function Shop() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const { addItem } = useCart();
 
   // Load parent categories and products on component mount
   useEffect(() => {
@@ -80,16 +78,6 @@ export default function Shop() {
     
     return matchesSearch && matchesCategory && matchesType && matchesPrice;
   });
-
-  const handleAddToCart = (product: Product) => {
-    addItem({
-      id: product.id.toString(),
-      title: product.name,
-      price: parseFloat(product.basePrice),
-      quantity: 1,
-      image: product.photoUrl || "/placeholder.svg",
-    });
-  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -273,9 +261,11 @@ export default function Shop() {
                           <Button 
                             size="sm" 
                             className="bg-gradient-primary hover:opacity-90"
-                            onClick={() => handleAddToCart(product)}
+                            asChild
                           >
-                            Add to Cart
+                            <Link to={`/store/product/${product.id}`}>
+                              See Details
+                            </Link>
                           </Button>
                         </div>
                       </div>

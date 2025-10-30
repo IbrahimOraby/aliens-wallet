@@ -9,7 +9,6 @@ import { categoriesService } from "@/services/categories";
 import { productsService } from "@/services/products";
 import { Category } from "@/types/category";
 import { Product } from "@/types/product";
-import { useCart } from "@/hooks/useCart";
 
 const featuredCategories = [
   {
@@ -97,7 +96,6 @@ export default function Homepage() {
   const [productCounts, setProductCounts] = useState<Record<number, number>>({});
   const [products, setProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
-  const { addItem } = useCart();
 
   // Load parent categories and products on component mount
   useEffect(() => {
@@ -171,16 +169,6 @@ export default function Homepage() {
     if (count === 0) return "0 products";
     if (count === 1) return "1 product";
     return `${count} products`;
-  };
-
-  const handleAddToCart = (product: Product) => {
-    addItem({
-      id: product.id.toString(),
-      title: product.name,
-      price: parseFloat(product.basePrice),
-      quantity: 1,
-      image: product.photoUrl || "/placeholder.svg",
-    });
   };
 
   return (
@@ -349,9 +337,11 @@ export default function Homepage() {
                       <Button 
                         size="sm" 
                         className="bg-gradient-primary hover:opacity-90"
-                        onClick={() => handleAddToCart(product)}
+                        asChild
                       >
-                        Add to Cart
+                        <Link to={`/store/product/${product.id}`}>
+                          See Details
+                        </Link>
                       </Button>
                     </div>
                   </div>
