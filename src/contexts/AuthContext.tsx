@@ -145,11 +145,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else if (state.user?.userType === 'CUSTOMER') {
       // Clear customer data (localStorage)
       console.log('🧹 Clearing customer localStorage data');
+      tokenManager.removeCustomerToken();
       infoManager.removeCustomerInfo();
     } else {
       // Clear both if user type is unknown (safety measure)
       console.log('🧹 Clearing all data (unknown user type)');
       tokenManager.removeAdminToken();
+      tokenManager.removeCustomerToken();
       infoManager.removeAdminInfo();
       infoManager.removeCustomerInfo();
     }
@@ -185,10 +187,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Check for customer user (localStorage)
+    const customerToken = tokenManager.getCustomerToken();
     const customerInfo = infoManager.getCustomerInfo();
+    console.log('🔑 Customer token exists:', !!customerToken);
     console.log('👤 Customer info found:', customerInfo);
-    if (customerInfo) {
+    if (customerInfo && customerToken) {
       dispatch({ type: 'SET_USER', payload: customerInfo });
+    } else if (customerInfo && !customerToken) {
+      // Customer info exists but no token, clean up
+      console.log('🧹 Cleaning up customer data (no token)');
+      infoManager.removeCustomerInfo();
+      dispatch({ type: 'SET_LOADING', payload: false });
     } else {
       // If no user found, set loading to false
       dispatch({ type: 'SET_LOADING', payload: false });

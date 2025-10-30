@@ -5,7 +5,7 @@ import { API_BASE_URL } from '@/config/api';
 class CartService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    const token = tokenManager.getAdminToken();
+    const token = tokenManager.getToken();
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -102,6 +102,16 @@ class CartService {
   async clearCart(): Promise<CartResponse> {
     const response = await this.request<CartResponse>('/cart', {
       method: 'DELETE',
+    });
+    return response;
+  }
+
+  /**
+   * Get the current cart
+   */
+  async getCart(): Promise<CartResponse> {
+    const response = await this.request<CartResponse>('/cart', {
+      method: 'GET',
     });
     return response;
   }

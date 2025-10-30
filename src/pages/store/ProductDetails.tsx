@@ -8,15 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
-import { useCart } from "@/hooks/useCart";
+import { useCart } from "@/contexts/CartContext";
 import { toast } from "@/hooks/use-toast";
 import { productsService } from "@/services/products";
 import { Product } from "@/types/product";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 
 export default function ProductDetails() {
   const { id } = useParams();
-  const { addItem } = useCart();
+  const { addItemToCart, isLoading } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +27,10 @@ export default function ProductDetails() {
   const [selectedDuration, setSelectedDuration] = useState<string>("");
   const [selectedVariationName, setSelectedVariationName] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
+  // Service product account setup
+  const [accountType, setAccountType] = useState<'existing' | 'new'>('existing');
+  const [serviceEmail, setServiceEmail] = useState("");
+  const [servicePassword, setServicePassword] = useState("");
 
   // Load product data on component mount
   useEffect(() => {
@@ -101,22 +108,56 @@ export default function ProductDetails() {
     return parseFloat(selectedVariation.price);
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product || !selectedVariation) return;
     
-    addItem({
-      id: product.id.toString(),
-      title: product.name,
-      price: calculatePrice(),
-      quantity,
-      image: product.photoUrl || "/placeholder.svg",
-      variation: selectedVariation,
-    });
+    // Validate SERVICE product account info
+    if (product.kind === "SERVICE") {
+      if (!serviceEmail || !servicePassword) {
+        toast({
+          title: "Account information required",
+          description: "Please provide email and password for the service account.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
-    toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
-    });
+    try {
+      await addItemToCart(
+        selectedVariation.id,
+        quantity,
+        {
+          productId: product.id,
+          productName: product.name,
+          productKind: product.kind,
+          variationName: selectedVariation.name,
+          price: calculatePrice(),
+          photoUrl: product.photoUrl || undefined,
+          accountType: product.kind === "SERVICE" ? accountType : undefined,
+          email: product.kind === "SERVICE" ? serviceEmail : undefined,
+          password: product.kind === "SERVICE" ? servicePassword : undefined,
+        }
+      );
+      
+      toast({
+        title: "Added to cart",
+        description: `${product.name} has been added to your cart.`,
+      });
+      
+      // Reset service account fields
+      if (product.kind === "SERVICE") {
+        setServiceEmail("");
+        setServicePassword("");
+        setAccountType('existing');
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to add to cart",
+        description: err instanceof Error ? err.message : "An error occurred",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -287,6 +328,52 @@ export default function ProductDetails() {
             </div>
           </div>
 
+          {/* Service Product Account Setup */}
+          {product.kind === "SERVICE" && selectedVariation && (
+            <div className="space-y-4 border-t pt-6">
+              <h3 className="text-lg font-semibold">Account Information</h3>
+              <p className="text-sm text-muted-foreground">
+                Do you have an existing account or want to create a new one?
+              </p>
+              
+              <RadioGroup value={accountType} onValueChange={(value) => setAccountType(value as 'existing' | 'new')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="existing" id="existing" />
+                  <Label htmlFor="existing" className="cursor-pointer">Existing Account</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="new" id="new" />
+                  <Label htmlFor="new" className="cursor-pointer">Create New Account</Label>
+                </div>
+              </RadioGroup>
+
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="serviceEmail">Email</Label>
+                  <Input
+                    id="serviceEmail"
+                    type="email"
+                    placeholder="account@example.com"
+                    value={serviceEmail}
+                    onChange={(e) => setServiceEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="servicePassword">Password</Label>
+                  <Input
+                    id="servicePassword"
+                    type="password"
+                    placeholder={accountType === 'existing' ? "Your existing password" : "Choose a password"}
+                    value={servicePassword}
+                    onChange={(e) => setServicePassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Price and Add to Cart */}
           <div className="border-t pt-6">
             {selectedVariation ? (
@@ -311,13 +398,25 @@ export default function ProductDetails() {
               className="w-full bg-gradient-primary hover:opacity-90 mb-4" 
               size="lg"
               onClick={handleAddToCart}
-              disabled={!selectedVariation || !product.isActive || !selectedRegion || !selectedDuration || !selectedVariationName}
+              disabled={
+                !selectedVariation || 
+                !product.isActive || 
+                !selectedRegion || 
+                !selectedDuration || 
+                !selectedVariationName ||
+                isLoading ||
+                (product.kind === "SERVICE" && (!serviceEmail || !servicePassword))
+              }
             >
-              {!product.isActive 
-                ? 'Product Unavailable' 
-                : !selectedVariation 
-                  ? 'Select Options First' 
-                  : `Add to Cart - $${(calculatePrice() * quantity).toFixed(2)}`
+              {isLoading
+                ? 'Adding to cart...'
+                : !product.isActive 
+                  ? 'Product Unavailable' 
+                  : !selectedVariation 
+                    ? 'Select Options First'
+                    : product.kind === "SERVICE" && (!serviceEmail || !servicePassword)
+                      ? 'Enter Account Information'
+                      : `Add to Cart - $${(calculatePrice() * quantity).toFixed(2)}`
               }
             </Button>
 

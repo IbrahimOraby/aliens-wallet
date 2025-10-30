@@ -20,6 +20,30 @@ export const tokenManager = {
     sessionStorage.removeItem('auth_token');
   },
   
+  // Customer token methods (stored in localStorage)
+  setCustomerToken: (token: string) => {
+    localStorage.setItem('customer_token', token);
+  },
+  
+  getCustomerToken: (): string | null => {
+    return localStorage.getItem('customer_token');
+  },
+  
+  removeCustomerToken: () => {
+    localStorage.removeItem('customer_token');
+  },
+  
+  // Unified method that returns the appropriate token based on user type
+  getToken: (): string | null => {
+    // Check if customer is logged in first (localStorage)
+    const customerToken = localStorage.getItem('customer_token');
+    if (customerToken) {
+      return customerToken;
+    }
+    // Otherwise check for admin token (sessionStorage)
+    return sessionStorage.getItem('auth_token');
+  },
+  
   isAdminTokenValid: (): boolean => {
     const token = sessionStorage.getItem('auth_token');
     if (!token) return false;
@@ -124,8 +148,12 @@ export class AuthService {
       const user = result.data.user;
       const token = result.data.token;
 
-      // Store token in sessionStorage
-      tokenManager.setAdminToken(token);
+      // Store token based on user type
+      if (user.userType === 'ADMIN') {
+        tokenManager.setAdminToken(token); // sessionStorage for admins
+      } else {
+        tokenManager.setCustomerToken(token); // localStorage for customers
+      }
 
       return {
         user: {

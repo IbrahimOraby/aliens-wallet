@@ -2,13 +2,13 @@ import { Link } from "react-router-dom";
 import { ShoppingCart, User, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/hooks/useCart";
+import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const StoreHeader = () => {
-  const { items } = useCart();
+  const { getTotalItemCount } = useCart();
   const { openAuthModal, isAuthenticated, user, logout } = useAuth();
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = getTotalItemCount();
 
   const handleLogout = () => {
     logout();

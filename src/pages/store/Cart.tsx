@@ -1,12 +1,35 @@
 import { Link } from "react-router-dom";
-import { Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
+import { Trash2, Plus, Minus, ShoppingBag, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/hooks/useCart";
+import { useCart } from "@/contexts/CartContext";
 
 export default function Cart() {
-  const { items, updateQuantity, removeItem, total } = useCart();
+  const { 
+    getDisplayItems, 
+    updateCartItemQuantity, 
+    updateLocalCartItemQuantity,
+    removeItemFromCart,
+    removeLocalCartItem,
+    getTotalAmount,
+    isLoading,
+    isLocalCart,
+  } = useCart();
+
+  const items = getDisplayItems();
+  const total = getTotalAmount();
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin mr-3" />
+          <span className="text-lg">Loading cart...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -31,23 +54,34 @@ export default function Cart() {
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
           {items.map((item) => (
-            <Card key={`${item.id}-${JSON.stringify(item.specifications)}`}>
+            <Card key={`${item.id}-${item.variationId}`}>
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 bg-gradient-card rounded-lg flex items-center justify-center flex-shrink-0">
-                    <img src={item.image} alt={item.title} className="w-12 h-12 object-contain" />
+                    <img 
+                      src={item.product.photoUrl || "/placeholder.svg"} 
+                      alt={item.product.name} 
+                      className="w-12 h-12 object-contain" 
+                    />
                   </div>
                   
                   <div className="flex-1">
-                    <h3 className="font-semibold mb-2">{item.title}</h3>
+                    <h3 className="font-semibold mb-2">{item.product.name}</h3>
                     
-                    {item.specifications && (
-                      <div className="flex gap-2 mb-2">
-                        {Object.entries(item.specifications).map(([key, value]) => (
-                          <Badge key={key} variant="secondary" className="text-xs">
-                            {key}: {value}
-                          </Badge>
-                        ))}
+                    <div className="flex gap-2 mb-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {item.variation.name}
+                      </Badge>
+                      {item.product.kind === "SERVICE" && item.accountType && (
+                        <Badge variant="outline" className="text-xs">
+                          {item.accountType === 'existing' ? 'Existing Account' : 'New Account'}
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {item.product.kind === "SERVICE" && item.email && (
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Email: {item.email}
                       </div>
                     )}
                     
@@ -57,7 +91,13 @@ export default function Cart() {
                           variant="outline"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => updateQuantity(item.id, item.quantity - 1, item.specifications)}
+                          onClick={() => {
+                            if (isLocalCart) {
+                              updateLocalCartItemQuantity(item.variationId, item.quantity - 1);
+                            } else {
+                              updateCartItemQuantity(item.id, item.quantity - 1);
+                            }
+                          }}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -66,15 +106,21 @@ export default function Cart() {
                           variant="outline"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={() => updateQuantity(item.id, item.quantity + 1, item.specifications)}
+                          onClick={() => {
+                            if (isLocalCart) {
+                              updateLocalCartItemQuantity(item.variationId, item.quantity + 1);
+                            } else {
+                              updateCartItemQuantity(item.id, item.quantity + 1);
+                            }
+                          }}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
                       </div>
                       
                       <div className="text-right">
-                        <div className="font-semibold text-primary">${item.price * item.quantity}</div>
-                        <div className="text-sm text-muted-foreground">${item.price} each</div>
+                        <div className="font-semibold text-primary">${(item.price * item.quantity).toFixed(2)}</div>
+                        <div className="text-sm text-muted-foreground">${item.price.toFixed(2)} each</div>
                       </div>
                     </div>
                   </div>
@@ -83,7 +129,13 @@ export default function Cart() {
                     variant="ghost"
                     size="icon"
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => removeItem(item.id, item.specifications)}
+                    onClick={() => {
+                      if (isLocalCart) {
+                        removeLocalCartItem(item.variationId);
+                      } else {
+                        removeItemFromCart(item.id);
+                      }
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

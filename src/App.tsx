@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { CartProvider } from "@/contexts/CartContext";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { CustomerProtectedRoute } from "@/components/CustomerProtectedRoute";
@@ -129,12 +130,14 @@ const router = createBrowserRouter([
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <RouterProvider router={router} />
-        <AuthModal />
-      </TooltipProvider>
+      <CartProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <RouterProvider router={router} />
+          <AuthModal />
+        </TooltipProvider>
+      </CartProvider>
     </AuthProvider>
   </QueryClientProvider>
 );
