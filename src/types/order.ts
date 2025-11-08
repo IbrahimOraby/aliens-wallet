@@ -1,3 +1,5 @@
+import { Product, ProductVariation, ProductVariationTemplate } from "./product";
+
 export interface OrderItem {
   id: number;
   productName: string;
@@ -5,6 +7,13 @@ export interface OrderItem {
   productCode?: string;
   quantity: number;
   price: number;
+  productKind?: "GIFTCARD" | "SERVICE";
+  accountType?: 'existing' | 'new';
+  email?: string;
+  password?: string;
+  productDetails?: Product;
+  variationDetails?: ProductVariation;
+  variationTemplate?: ProductVariationTemplate;
 }
 
 export interface OrderUser {
@@ -24,6 +33,9 @@ export interface Order {
   totalAmount: number;
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELLED";
   items: OrderItem[];
+  additionalInfo?: {
+    [key: string]: any;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -61,5 +73,9 @@ export interface OrderFilters {
   offset?: number;
   limit?: number;
   status?: "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELLED";
+}
+
+export interface UpdateOrderStatusRequest {
+  status: "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELLED";
 }
 

@@ -1,8 +1,12 @@
-import { Product, ProductResponse, CreateProductRequest, UpdateProductRequest, ProductFilters } from '@/types/product';
+import { Product, ProductResponse, CreateProductRequest, UpdateProductRequest, ProductFilters, ProductVariationTemplate, ProductVariationTemplateResponse } from '@/types/product';
 import { tokenManager } from '@/services/auth';
 import { API_BASE_URL } from '@/config/api';
 
 class ProductsService {
+  private normalizeName(value: string) {
+    return value?.trim().toLowerCase();
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const token = tokenManager.getAdminToken();
@@ -149,6 +153,68 @@ class ProductsService {
    */
   async searchProducts(searchTerm: string, offset = 0, limit = 10): Promise<ProductResponse> {
     return this.getProducts({ offset, limit, search: searchTerm });
+  }
+
+  /**
+   * Find a product by exact name (case-insensitive). Falls back to partial match.
+   */
+  async findProductByName(productName: string, limit = 100): Promise<Product | null> {
+    const normalizedSearch = productName?.trim();
+    if (!normalizedSearch) {
+      return null;
+    }
+
+    const response = await this.getProducts({ search: normalizedSearch, limit });
+    const normalizedTarget = this.normalizeName(normalizedSearch);
+
+    const exactMatch = response.data.find(
+      (product) => this.normalizeName(product.name) === normalizedTarget
+    );
+
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    const partialMatch = response.data.find((product) =>
+      this.normalizeName(product.name).includes(normalizedTarget)
+    );
+
+    return partialMatch ?? null;
+  }
+
+  /**
+   * Fetch all variation templates available to the current admin.
+   */
+  async getVariationTemplates(): Promise<ProductVariationTemplate[]> {
+    const response = await this.request<ProductVariationTemplateResponse>('/products/variations/my-templates');
+    return Array.isArray(response.data) ? response.data : [];
+  }
+
+  /**
+   * Find a variation template by name (case-insensitive). Falls back to partial match.
+   */
+  async findVariationTemplateByName(variationName: string): Promise<ProductVariationTemplate | null> {
+    const normalizedSearch = variationName?.trim();
+    if (!normalizedSearch) {
+      return null;
+    }
+
+    const templates = await this.getVariationTemplates();
+    const normalizedTarget = this.normalizeName(normalizedSearch);
+
+    const exactMatch = templates.find(
+      (template) => this.normalizeName(template.name) === normalizedTarget
+    );
+
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    const partialMatch = templates.find((template) =>
+      this.normalizeName(template.name).includes(normalizedTarget)
+    );
+
+    return partialMatch ?? null;
   }
 }
 

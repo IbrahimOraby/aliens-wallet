@@ -1,11 +1,12 @@
-import { OrderResponse, OrdersResponse, CheckoutRequest, OrderFilters } from '@/types/order';
+import { OrderResponse, OrdersResponse, CheckoutRequest, OrderFilters, UpdateOrderStatusRequest } from '@/types/order';
 import { tokenManager } from '@/services/auth';
 import { API_BASE_URL } from '@/config/api';
 
 class OrdersService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    const token = tokenManager.getToken();
+    // Prefer admin token for orders (admin endpoints), fall back to customer token
+    const token = tokenManager.getAdminToken() || tokenManager.getCustomerToken();
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -112,6 +113,17 @@ class OrdersService {
    */
   async getOrderById(id: number): Promise<OrderResponse> {
     const response = await this.request<OrderResponse>(`/cart/orders/${id}`);
+    return response;
+  }
+
+  /**
+   * Update order status (Admin only)
+   */
+  async updateOrderStatus(id: number, payload: UpdateOrderStatusRequest): Promise<OrderResponse> {
+    const response = await this.request<OrderResponse>(`/cart/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
     return response;
   }
 }

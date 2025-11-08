@@ -27,6 +27,22 @@ export interface ProductVariation {
   }>;
 }
 
+export interface ProductVariationTemplateRegion {
+  regionId: number;
+  regionName: string;
+  regionCode: string;
+}
+
+export interface ProductVariationTemplate {
+  name: string;
+  price: string;
+  duration: number | null;
+  maxUsers: number | null;
+  availableCount: number | null;
+  regions: ProductVariationTemplateRegion[];
+  usageCount: number;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -76,6 +92,17 @@ export interface ProductResponse {
     total: number;
     offset: number;
     limit: number;
+  };
+}
+
+export interface ProductVariationTemplateResponse {
+  success: boolean;
+  data: ProductVariationTemplate[];
+  meta: {
+    total: number;
+    offset: number;
+    limit: number | null;
+    totalProducts?: number;
   };
 }
 
