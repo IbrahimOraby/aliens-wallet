@@ -15,6 +15,7 @@ import { Product } from "@/types/product";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { formatDurationInDays } from "@/utils/time";
 
 
 export default function ProductDetails() {
@@ -299,7 +300,7 @@ export default function ProductDetails() {
                     <SelectContent>
                       {getAvailableDurations().map((duration) => (
                         <SelectItem key={duration} value={duration.toString()}>
-                          {duration} days
+                          {formatDurationInDays(duration)}
                         </SelectItem>
                       ))}
                     </SelectContent>

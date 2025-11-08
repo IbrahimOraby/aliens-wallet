@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,9 @@ export default function Products() {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,12 +63,48 @@ export default function Products() {
     }
   });
 
-  // Load products, categories, and regions on component mount
+  const loadProducts = useCallback(async (options?: { offset?: number; limit?: number }) => {
+    const requestOffset = options?.offset ?? offset;
+    const requestLimit = options?.limit ?? limit;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await productsService.getProducts({ offset: requestOffset, limit: requestLimit });
+      setProducts(response.data);
+
+      const meta = response.meta ?? {};
+      const metaTotal = typeof meta.total === "number" ? meta.total : response.data.length;
+      setTotal(metaTotal);
+
+      if (typeof meta.offset === "number" && meta.offset !== offset) {
+        setOffset(meta.offset);
+      }
+
+      if (
+        typeof meta.limit === "number" &&
+        meta.limit > 0 &&
+        meta.limit !== limit
+      ) {
+        setLimit(meta.limit);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load products");
+    } finally {
+      setLoading(false);
+    }
+  }, [offset, limit]);
+
+  // Load categories and regions on component mount
   useEffect(() => {
-    loadProducts();
     loadCategories();
     loadRegions();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load products whenever pagination changes
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   // Load subcategories when product type changes
   const productTypeId = form.watch("productTypeId");
@@ -80,19 +119,6 @@ export default function Products() {
       setSubcategories([]);
     }
   }, [productTypeId, editingProduct, form]);
-
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await productsService.getProducts({ offset: 0, limit: 50 });
-      setProducts(response.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load products');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadCategories = async () => {
     try {
@@ -934,6 +960,46 @@ export default function Products() {
                   <p className="text-muted-foreground">No products found. Create your first product to get started.</p>
                 </div>
               )}
+
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing {products.length > 0 ? offset + 1 : 0}-{Math.min(offset + limit, total)} of {total}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={offset === 0}
+                    onClick={() => setOffset(Math.max(0, offset - limit))}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={offset + limit >= total}
+                    onClick={() => setOffset(offset + limit)}
+                  >
+                    Next
+                  </Button>
+                  <Select
+                    value={String(limit)}
+                    onValueChange={(value) => {
+                      setOffset(0);
+                      setLimit(Number(value));
+                    }}
+                  >
+                    <SelectTrigger className="w-[110px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 / page</SelectItem>
+                      <SelectItem value="20">20 / page</SelectItem>
+                      <SelectItem value="50">50 / page</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </>
           )}
         </CardContent>

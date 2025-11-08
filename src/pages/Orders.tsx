@@ -15,6 +15,7 @@ import { ordersService } from "@/services/orders";
 import { productsService } from "@/services/products";
 import { Order } from "@/types/order";
 import type { Product, ProductVariation, ProductVariationTemplate } from "@/types/product";
+import { formatDurationInDays } from "@/utils/time";
 
 type OrderStatusFilter = "all" | "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELLED";
 
@@ -353,7 +354,7 @@ export default function Orders() {
       <div className="text-xs text-muted-foreground space-y-1">
         {item.variationName && <p>Variation: {item.variationName}</p>}
         {showVariationPrice && <p>Variation price: {priceLabel}</p>}
-        {duration !== undefined && duration !== null && <p>Duration: {duration} days</p>}
+        {duration !== undefined && duration !== null && <p>Duration: {formatDurationInDays(duration)}</p>}
         {maxUsers !== undefined && maxUsers !== null && <p>Max users: {maxUsers}</p>}
         {regionNames.length > 0 && <p>Regions: {regionNames.join(", ")}</p>}
       </div>
