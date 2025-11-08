@@ -71,35 +71,42 @@ export default function ProductDetails() {
     return Array.from(regionsSet).map(r => JSON.parse(r));
   };
 
-  // Get available durations based on selected region
+  // Get available durations based on selected region and type
   const getAvailableDurations = () => {
-    if (!product || !selectedRegion) return [];
+    if (!product || !selectedRegion || !selectedVariationName) return [];
     const durationsSet = new Set<number>();
     product.variations.forEach(variation => {
       const hasRegion = variation.regions?.some(r => r.regionId.toString() === selectedRegion);
-      if (hasRegion && variation.duration) {
+      const hasName = variation.name === selectedVariationName;
+      if (hasRegion && hasName && variation.duration) {
         durationsSet.add(variation.duration);
       }
     });
     return Array.from(durationsSet).sort((a, b) => a - b);
   };
 
-  // Get available variation names based on selected region and duration
+  // Get available variation names based on selected region
   const getAvailableVariationNames = () => {
-    if (!product || !selectedRegion || !selectedDuration) return [];
-    const variations = product.variations.filter(variation => {
-      const hasRegion = variation.regions?.some(r => r.regionId.toString() === selectedRegion);
-      const hasDuration = variation.duration?.toString() === selectedDuration;
-      return hasRegion && hasDuration;
+    if (!product || !selectedRegion) return [];
+    const variations = product.variations.filter(variation =>
+      variation.regions?.some(r => r.regionId.toString() === selectedRegion)
+    );
+
+    const uniqueNames = new Map<string, { id: string; name: string }>();
+    variations.forEach(variation => {
+      if (!uniqueNames.has(variation.name)) {
+        uniqueNames.set(variation.name, { id: variation.name, name: variation.name });
+      }
     });
-    return variations.map(v => ({ id: v.id.toString(), name: v.name }));
+
+    return Array.from(uniqueNames.values());
   };
 
   // Find matching variation based on all selections
   const selectedVariation = product?.variations.find(v => {
     const hasRegion = v.regions?.some(r => r.regionId.toString() === selectedRegion);
     const hasDuration = v.duration?.toString() === selectedDuration;
-    const hasName = v.id.toString() === selectedVariationName;
+    const hasName = v.name === selectedVariationName;
     return hasRegion && hasDuration && hasName;
   });
   
@@ -233,12 +240,12 @@ export default function ProductDetails() {
                 {/* Region Selection */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Region</label>
-                  <Select 
-                    value={selectedRegion} 
+                  <Select
+                    value={selectedRegion}
                     onValueChange={(value) => {
                       setSelectedRegion(value);
-                      setSelectedDuration("");
                       setSelectedVariationName("");
+                      setSelectedDuration("");
                     }}
                   >
                     <SelectTrigger>
@@ -254,45 +261,45 @@ export default function ProductDetails() {
                   </Select>
                 </div>
 
-                {/* Duration Selection */}
+                {/* Variation Name Selection */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Duration</label>
-                  <Select 
-                    value={selectedDuration} 
+                  <label className="text-sm font-medium mb-2 block">Type</label>
+                  <Select
+                    value={selectedVariationName}
                     onValueChange={(value) => {
-                      setSelectedDuration(value);
-                      setSelectedVariationName("");
+                      setSelectedVariationName(value);
+                      setSelectedDuration("");
                     }}
                     disabled={!selectedRegion}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedRegion ? "Select duration" : "Select region first"} />
+                      <SelectValue placeholder={selectedRegion ? "Select type" : "Select region first"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {getAvailableDurations().map((duration) => (
-                        <SelectItem key={duration} value={duration.toString()}>
-                          {duration} days
+                      {getAvailableVariationNames().map((variation) => (
+                        <SelectItem key={variation.id} value={variation.id}>
+                          {variation.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Variation Name Selection */}
+                {/* Duration Selection */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Type</label>
-                  <Select 
-                    value={selectedVariationName} 
-                    onValueChange={setSelectedVariationName}
-                    disabled={!selectedRegion || !selectedDuration}
+                  <label className="text-sm font-medium mb-2 block">Duration</label>
+                  <Select
+                    value={selectedDuration}
+                    onValueChange={setSelectedDuration}
+                    disabled={!selectedRegion || !selectedVariationName}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedDuration ? "Select type" : "Select duration first"} />
+                      <SelectValue placeholder={selectedVariationName ? "Select duration" : "Select type first"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {getAvailableVariationNames().map((variation) => (
-                        <SelectItem key={variation.id} value={variation.id}>
-                          {variation.name}
+                      {getAvailableDurations().map((duration) => (
+                        <SelectItem key={duration} value={duration.toString()}>
+                          {duration} days
                         </SelectItem>
                       ))}
                     </SelectContent>
