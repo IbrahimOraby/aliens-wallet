@@ -198,19 +198,19 @@ export default function Homepage() {
                   <div className="absolute inset-0 bg-black/40" />
                   
                   {/* Content */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="container mx-auto px-4 text-center text-white">
-                      <div className="max-w-4xl mx-auto">
-                        <Badge variant="secondary" className="mb-4 text-sm">
+                  <div className="absolute inset-0 flex items-center justify-start">
+                    <div className="container px-4 text-left text-white">
+                      <div className="max-w-4xl">
+                        <Badge variant="secondary" className="mb-4 text-sm w-fit">
                           {slide.subtitle}
                         </Badge>
                         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
                           {slide.title}
                         </h1>
-                        <p className="text-lg md:text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
+                        <p className="text-lg md:text-xl text-gray-200 mb-8 max-w-2xl">
                           {slide.description}
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <div className="flex flex-col sm:flex-row gap-4 justify-start">
                           <Button asChild size="lg" className="bg-gradient-primary hover:opacity-90">
                             <Link to={slide.buttonLink}>
                               {slide.buttonText} <ArrowRight className="ml-2 h-5 w-5" />
