@@ -24,7 +24,12 @@ export const checkoutSchema = z.object({
         message: "Please enter a valid phone number (e.g., +1234567890)",
       }
     ),
-  customerPassword: z
+  serviceAccountType: z.enum(["EXISTING", "NEW"]).optional(),
+  serviceAccountEmail: z
+    .string()
+    .email("Please enter a valid service account email")
+    .optional(),
+  serviceAccountPassword: z
     .string()
     .optional()
     .refine(
@@ -33,9 +38,6 @@ export const checkoutSchema = z.object({
         message: "Password must be at least 8 characters if provided",
       }
     ),
-  additionalInfo: z
-    .record(z.any())
-    .optional(),
 });
 
 export type CheckoutFormData = z.infer<typeof checkoutSchema>;

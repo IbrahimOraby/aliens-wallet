@@ -15,6 +15,7 @@ import Orders from "@/pages/Orders";
 import Categories from "@/pages/Categories";
 import Specifications from "@/pages/Specifications";
 import Products from "@/pages/Products";
+import Customers from "@/pages/Customers";
 import Unauthorized from "@/pages/Unauthorized";
 import AdminUnauthorized from "@/pages/AdminUnauthorized";
 import Homepage from "@/pages/store/Homepage";
@@ -48,6 +49,10 @@ const router = createBrowserRouter([
       {
         path: "categories",
         element: <Categories />,
+      },
+      {
+        path: "customers",
+        element: <Customers />,
       },
       // {
       //   path: "specifications",

@@ -1,4 +1,4 @@
-import { BarChart3, Package, ShoppingCart, Tags, Settings, Grid3X3, Home } from "lucide-react";
+import { BarChart3, Package, ShoppingCart, Tags, Settings, Grid3X3, Home, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -17,6 +17,7 @@ const navigationItems = [
   { title: "Overview", url: "/admin", icon: BarChart3 },
   { title: "Orders", url: "/admin/orders", icon: ShoppingCart },
   { title: "Categories", url: "/admin/categories", icon: Tags },
+  { title: "Customers", url: "/admin/customers", icon: Users },
   // { title: "Specifications", url: "/admin/specifications", icon: Grid3X3 },
   { title: "Products", url: "/admin/products", icon: Package },
 ];

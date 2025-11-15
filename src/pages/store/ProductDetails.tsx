@@ -12,9 +12,6 @@ import { useCart } from "@/contexts/CartContext";
 import { toast } from "@/hooks/use-toast";
 import { productsService } from "@/services/products";
 import { Product } from "@/types/product";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatDurationInDays } from "@/utils/time";
 
 
@@ -29,9 +26,6 @@ export default function ProductDetails() {
   const [selectedVariationName, setSelectedVariationName] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
   // Service product account setup
-  const [accountType, setAccountType] = useState<'existing' | 'new'>('existing');
-  const [serviceEmail, setServiceEmail] = useState("");
-  const [servicePassword, setServicePassword] = useState("");
 
   // Load product data on component mount
   useEffect(() => {
@@ -118,19 +112,6 @@ export default function ProductDetails() {
 
   const handleAddToCart = async () => {
     if (!product || !selectedVariation) return;
-    
-    // Validate SERVICE product account info
-    if (product.kind === "SERVICE") {
-      if (!serviceEmail || !servicePassword) {
-        toast({
-          title: "Account information required",
-          description: "Please provide email and password for the service account.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
     try {
       await addItemToCart(
         selectedVariation.id,
@@ -142,9 +123,6 @@ export default function ProductDetails() {
           variationName: selectedVariation.name,
           price: calculatePrice(),
           photoUrl: product.photoUrl || undefined,
-          accountType: product.kind === "SERVICE" ? accountType : undefined,
-          email: product.kind === "SERVICE" ? serviceEmail : undefined,
-          password: product.kind === "SERVICE" ? servicePassword : undefined,
         }
       );
       
@@ -152,13 +130,6 @@ export default function ProductDetails() {
         title: "Added to cart",
         description: `${product.name} has been added to your cart.`,
       });
-      
-      // Reset service account fields
-      if (product.kind === "SERVICE") {
-        setServiceEmail("");
-        setServicePassword("");
-        setAccountType('existing');
-      }
     } catch (err) {
       toast({
         title: "Failed to add to cart",
@@ -336,49 +307,14 @@ export default function ProductDetails() {
             </div>
           </div>
 
-          {/* Service Product Account Setup */}
+          {/* Service Product Account Info Notice */}
           {product.kind === "SERVICE" && selectedVariation && (
-            <div className="space-y-4 border-t pt-6">
-              <h3 className="text-lg font-semibold">Account Information</h3>
+            <div className="space-y-3 border-t pt-6">
+              <h3 className="text-lg font-semibold">Service Account Details</h3>
               <p className="text-sm text-muted-foreground">
-                Do you have an existing account or want to create a new one?
+                We’ll collect the email, password, and whether you’d like to use an existing account or
+                create a new one during checkout so our team can complete the service setup for you.
               </p>
-              
-              <RadioGroup value={accountType} onValueChange={(value) => setAccountType(value as 'existing' | 'new')}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="existing" id="existing" />
-                  <Label htmlFor="existing" className="cursor-pointer">Existing Account</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="new" id="new" />
-                  <Label htmlFor="new" className="cursor-pointer">Create New Account</Label>
-                </div>
-              </RadioGroup>
-
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="serviceEmail">Email</Label>
-                  <Input
-                    id="serviceEmail"
-                    type="email"
-                    placeholder="account@example.com"
-                    value={serviceEmail}
-                    onChange={(e) => setServiceEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="servicePassword">Password</Label>
-                  <Input
-                    id="servicePassword"
-                    type="password"
-                    placeholder={accountType === 'existing' ? "Your existing password" : "Choose a password"}
-                    value={servicePassword}
-                    onChange={(e) => setServicePassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
             </div>
           )}
 
@@ -412,8 +348,7 @@ export default function ProductDetails() {
                 !selectedRegion || 
                 !selectedDuration || 
                 !selectedVariationName ||
-                isLoading ||
-                (product.kind === "SERVICE" && (!serviceEmail || !servicePassword))
+                isLoading
               }
             >
               {isLoading
@@ -422,9 +357,7 @@ export default function ProductDetails() {
                   ? 'Product Unavailable' 
                   : !selectedVariation 
                     ? 'Select Options First'
-                    : product.kind === "SERVICE" && (!serviceEmail || !servicePassword)
-                      ? 'Enter Account Information'
-                      : `Add to Cart - $${(calculatePrice() * quantity).toFixed(2)}`
+                    : `Add to Cart - $${(calculatePrice() * quantity).toFixed(2)}`
               }
             </Button>
 

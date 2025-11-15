@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -13,6 +14,7 @@ import { ordersService } from "@/services/orders";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { checkoutSchema, CheckoutFormData } from "@/schemas/order";
+import type { CheckoutRequest } from "@/types/order";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Checkout() {
@@ -23,7 +25,7 @@ export default function Checkout() {
     hasServiceProducts,
     isLoading: cartLoading,
   } = useCart();
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal, user } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,6 +38,8 @@ export default function Checkout() {
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
@@ -43,10 +47,31 @@ export default function Checkout() {
       customerName: "",
       customerEmail: "",
       customerPhone: "",
-      customerPassword: "",
-      additionalInfo: {},
+      serviceAccountType: "EXISTING",
+      serviceAccountEmail: "",
+      serviceAccountPassword: "",
     },
   });
+
+  const serviceAccountType = watch("serviceAccountType") || "EXISTING";
+  const customerNameValue = watch("customerName");
+  const customerEmailValue = watch("customerEmail");
+  const customerPhoneValue = watch("customerPhone");
+
+  useEffect(() => {
+    if (user) {
+      if (user.name) {
+        setValue("customerName", user.name, { shouldDirty: false });
+      }
+      if (user.email) {
+        setValue("customerEmail", user.email, { shouldDirty: false });
+        setValue("serviceAccountEmail", user.email, { shouldDirty: false });
+      }
+      if (user.phoneNumber) {
+        setValue("customerPhone", user.phoneNumber, { shouldDirty: false });
+      }
+    }
+  }, [user, setValue]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -123,65 +148,88 @@ export default function Checkout() {
       return;
     }
 
+    const trimmedName = typeof data.customerName === "string" ? data.customerName.trim() : "";
+    const trimmedEmail = typeof data.customerEmail === "string" ? data.customerEmail.trim() : "";
+    const trimmedPhone = typeof data.customerPhone === "string" ? data.customerPhone.trim() : "";
+
+    const fallbackName = trimmedName || user?.name || "";
+    const fallbackEmail = trimmedEmail || user?.email || "";
+
+    if (!fallbackName || !fallbackEmail) {
+      toast({
+        title: "Contact details required",
+        description: "Please make sure your name and email are filled in.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
-      // TEMPORARY FIX: If cart contains ONLY GIFTCARD products, send minimal payload
-      // TODO: Remove this when backend is fixed
       if (!hasServices) {
-        // Only GIFTCARD products - send minimal payload
-        const minimalPayload = {
-          customerName: data.customerName,
-          customerEmail: data.customerEmail,
+        const minimalPayload: CheckoutRequest = {
+          customerName: fallbackName,
+          customerEmail: fallbackEmail,
         };
-        
-        const response = await ordersService.checkout(minimalPayload as any);
-        
+
+        if (trimmedPhone) {
+          minimalPayload.customerPhone = trimmedPhone;
+        }
+
+        const response = await ordersService.checkout(minimalPayload);
+
         if (response.success) {
           await clearCart();
           navigate(`/store/order-confirmation/${response.data.orderNumber}`);
         }
       } else {
-        // Has SERVICE products - send full payload
-        const checkoutPayload: any = {
-          customerName: data.customerName,
-          customerEmail: data.customerEmail,
+        const serviceEmail =
+          (typeof data.serviceAccountEmail === "string" ? data.serviceAccountEmail.trim() : "") ||
+          fallbackEmail;
+        const servicePassword =
+          typeof data.serviceAccountPassword === "string" ? data.serviceAccountPassword : undefined;
+        const servicePreference = data.serviceAccountType;
+
+        if (!servicePreference || !serviceEmail || !servicePassword) {
+          setIsSubmitting(false);
+          toast({
+            title: "Service details required",
+            description: "Please select account preference and provide the service email and password.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const checkoutPayload: CheckoutRequest = {
+          customerName: fallbackName,
+          customerEmail: serviceEmail,
+          customerPassword: servicePassword,
         };
 
-        // Add optional fields
-        if (data.customerPhone) {
-          checkoutPayload.customerPhone = data.customerPhone;
+        if (trimmedPhone) {
+          checkoutPayload.customerPhone = trimmedPhone;
         }
 
-        // Check if any service item needs password (new account)
-        const serviceItemsNeedingPassword = items.filter(
-          item => item.product.kind === "SERVICE" && item.accountType === 'new'
-        );
+        const serviceItems = items
+          .filter((item) => item.product.kind === "SERVICE")
+          .map((item) => ({
+            productName: item.product.name,
+            variationName: item.variation.name,
+            quantity: item.quantity,
+          }));
 
-        if (serviceItemsNeedingPassword.length > 0 && data.customerPassword) {
-          checkoutPayload.customerPassword = data.customerPassword;
-        }
-
-        // Add additionalInfo if there are service products
-        if (hasServices) {
-          const serviceAccountInfo: any = {};
-          items.forEach((item, index) => {
-            if (item.product.kind === "SERVICE") {
-              serviceAccountInfo[`service_${index}`] = {
-                productName: item.product.name,
-                variationName: item.variation.name,
-                accountType: item.accountType,
-                email: item.email,
-              };
-            }
-          });
-          if (Object.keys(serviceAccountInfo).length > 0) {
-            checkoutPayload.additionalInfo = serviceAccountInfo;
-          }
-        }
+        checkoutPayload.additionalInfo = {
+          contactEmail: fallbackEmail,
+          serviceAccount: {
+            preference: servicePreference,
+            email: serviceEmail,
+          },
+          serviceItems,
+        };
 
         const response = await ordersService.checkout(checkoutPayload);
-        
+
         if (response.success) {
           await clearCart();
           navigate(`/store/order-confirmation/${response.data.orderNumber}`);
@@ -216,69 +264,142 @@ export default function Checkout() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Customer Information</CardTitle>
+                <CardTitle>Contact Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="customerName">Full Name</Label>
-                  <Input
-                    id="customerName"
-                    {...register("customerName")}
-                    placeholder="John Doe"
-                  />
-                  {errors.customerName && (
-                    <p className="text-sm text-destructive mt-1">{errors.customerName.message}</p>
-                  )}
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">Full Name</Label>
+                  <p className="font-medium">
+                    {customerNameValue || user?.name || "Not available"}
+                  </p>
                 </div>
 
-                <div>
-                  <Label htmlFor="customerEmail">Email Address</Label>
-                  <Input
-                    id="customerEmail"
-                    type="email"
-                    {...register("customerEmail")}
-                    placeholder="your@email.com"
-                  />
-                  {errors.customerEmail && (
-                    <p className="text-sm text-destructive mt-1">{errors.customerEmail.message}</p>
-                  )}
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">Email</Label>
+                  <p className="font-medium">
+                    {customerEmailValue || user?.email || "Not available"}
+                  </p>
                 </div>
 
-                <div>
-                  <Label htmlFor="customerPhone">Phone Number (Optional)</Label>
-                  <Input
-                    id="customerPhone"
-                    type="tel"
-                    {...register("customerPhone")}
-                    placeholder="+1234567890"
-                  />
-                  {errors.customerPhone && (
-                    <p className="text-sm text-destructive mt-1">{errors.customerPhone.message}</p>
-                  )}
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">Phone</Label>
+                  <p className="font-medium">
+                    {customerPhoneValue || user?.phoneNumber || "Not provided"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    We’ll use this if we need to contact you about delivery or activation.
+                  </p>
                 </div>
-
-                {/* Show password field only if there are service products with new accounts */}
-                {hasServices && items.some(item => 
-                  item.product.kind === "SERVICE" && item.accountType === 'new'
-                ) && (
-                  <div>
-                    <Label htmlFor="customerPassword">Password for New Accounts (Optional)</Label>
-                    <Input
-                      id="customerPassword"
-                      type="password"
-                      {...register("customerPassword")}
-                      placeholder="Choose a password"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This password will be used for new service accounts if applicable.
-                    </p>
-                    {errors.customerPassword && (
-                      <p className="text-sm text-destructive mt-1">{errors.customerPassword.message}</p>
-                    )}
-                  </div>
-                )}
               </CardContent>
             </Card>
+
+            {/* Hidden inputs to submit contact info */}
+            <input
+              type="hidden"
+              {...register("customerName", {
+                setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
+              })}
+            />
+            <input
+              type="hidden"
+              {...register("customerEmail", {
+                setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
+              })}
+            />
+            <input
+              type="hidden"
+              {...register("customerPhone", {
+                setValueAs: (value) => (typeof value === "string" ? value.trim() : value),
+              })}
+            />
+
+            {hasServices && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Service Account Setup</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Provide the details we should use to activate your digital service. We only use this
+                    information to complete your order.
+                  </p>
+
+                  <div className="space-y-3">
+                    <Label>Account Preference</Label>
+                    <input type="hidden" {...register("serviceAccountType")} />
+                    <RadioGroup
+                      value={serviceAccountType}
+                      onValueChange={(value) =>
+                        setValue("serviceAccountType", value as "EXISTING" | "NEW", { shouldDirty: true })
+                      }
+                      className="flex flex-col gap-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="EXISTING" id="service-existing" />
+                        <Label htmlFor="service-existing" className="cursor-pointer">
+                          Add service to my existing account
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="NEW" id="service-new" />
+                        <Label htmlFor="service-new" className="cursor-pointer">
+                          Create a new account for me
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                    {errors.serviceAccountType && (
+                      <p className="text-sm text-destructive">{errors.serviceAccountType.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="serviceAccountEmail">Service Account Email</Label>
+                    <Input
+                      id="serviceAccountEmail"
+                      type="email"
+                      placeholder="service@example.com"
+                      {...register("serviceAccountEmail", {
+                        setValueAs: (value) => {
+                          if (typeof value !== "string") return value;
+                          const trimmed = value.trim();
+                          return trimmed.length > 0 ? trimmed : undefined;
+                        },
+                      })}
+                    />
+                    {errors.serviceAccountEmail && (
+                      <p className="text-sm text-destructive mt-1">{errors.serviceAccountEmail.message}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="serviceAccountPassword">
+                      {serviceAccountType === "NEW"
+                        ? "Password for the new account"
+                        : "Password for your existing account"}
+                    </Label>
+                    <Input
+                      id="serviceAccountPassword"
+                      type="password"
+                      placeholder="Enter a secure password"
+                      {...register("serviceAccountPassword", {
+                        setValueAs: (value) => {
+                          if (typeof value !== "string") return value;
+                          const trimmed = value.trim();
+                          return trimmed.length > 0 ? trimmed : undefined;
+                        },
+                      })}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Our support team will use this to configure your service. You can update it again after
+                      activation.
+                    </p>
+                    {errors.serviceAccountPassword && (
+                      <p className="text-sm text-destructive mt-1">{errors.serviceAccountPassword.message}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Terms */}
             <div className="flex items-center space-x-2">

@@ -4,4 +4,5 @@ export { regionsService } from './regions';
 export { cartService } from './cart';
 export { ordersService } from './orders';
 export { AuthService, tokenManager, infoManager } from './auth';
+export { usersService } from './users';
 
